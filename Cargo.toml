@@ -1,0 +1,10 @@
+[package]
+name = "raudient"
+version = "0.1.0"
+authors = ["dujiajiyi"]
+
+[dependencies]
+gtk = "0.1.2"
+chrono = "0.3.0"
+hostname = "0.1.3"
+local-ip = "0.1.0"
