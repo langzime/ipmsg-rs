@@ -12,12 +12,12 @@ pub fn send(socket: UdpSocket, tar_ip: &str, packet: Packet) {
     println!("{} {}", local_ip, tar_ip);
     if local_ip != tar_ip {
         if cmd == constant::IPMSG_BR_ENTRY {
-            println!("{}发送上线通知消息", cmd);
+            println!("{:x}发送上线通知消息", cmd);
             socket.set_broadcast(true).unwrap();
             let addr:String = format!("{}:{}", constant::IPMSG_LIMITED_BROADCAST, constant::IPMSG_DEFAULT_PORT);
             socket.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
         }else if cmd == constant::IPMSG_ANSENTRY {
-            println!("{}发送上线应答信息", cmd);
+            println!("{:x}发送上线应答信息", cmd);
             socket.set_broadcast(false).unwrap();
             let addr:String = format!("{}:{}", tar_ip, constant::IPMSG_DEFAULT_PORT);
             socket.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
