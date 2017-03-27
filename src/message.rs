@@ -7,9 +7,7 @@ use chrono::prelude::*;
 
 ///发送消息
 pub fn send(socket: UdpSocket, tar_ip: &str, packet: Packet) {
-    println!("1");
     let cmd = constant::get_mode(packet.command_no);
-    println!("2");
     let local_ip = constant::get_local_ip().unwrap().to_string();
     println!("{} {}", local_ip, tar_ip);
     if local_ip != tar_ip {
