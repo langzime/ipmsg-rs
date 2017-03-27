@@ -156,7 +156,6 @@ fn main() {
 
     //启动发送上线消息
     demons::send_ipmsg_br_entry(sock_clone1);
-    window.show_all();
 
     window.add(&grid);
     window.show_all();

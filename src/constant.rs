@@ -75,7 +75,7 @@ pub const IPMSG_FILEATTACHOPT: u32 = 0x00200000;
 pub const IPMSG_ENCRYPTOPT: u32 = 0x00400000;
 ///全部使用utf-8
 pub const IPMSG_UTF8OPT: u32 = 0x00800000;
-///兼容utf-i
+///兼容utf-8
 pub const IPMSG_CAPUTF8OPT: u32 = 0x01000000;
 ///加密的附件信息
 pub const IPMSG_ENCEXTMSGOPT: u32 = 0x04000000;
@@ -85,7 +85,7 @@ pub const IPMSG_CAPFILEENC_OBSLT: u32 = 0x00001000;
 pub const IPMSG_CAPFILEENCOPT: u32 = 0x00040000;
 
 /* option for sendmsg command */
-///传书校验
+///需要回信确认
 pub const IPMSG_SENDCHECKOPT: u32 = 0x00000100;
 //密封消息
 pub const IPMSG_SECRETOPT: u32 = 0x00000200;
