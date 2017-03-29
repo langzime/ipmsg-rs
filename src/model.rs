@@ -52,7 +52,7 @@ impl Packet {
 impl ToString for Packet {
     fn to_string(&self) -> String {
         let ext = &self.additional_section;
-        //ext.as_ref().unwrap_or(&hostname))
+        //ext.as_ref().unwrap_or(&hostname)
         let hostname = ::hostname::get_hostname().unwrap();
         format!("{}:{}:{}:{}:{}:{}",
                 self.ver,
@@ -60,7 +60,7 @@ impl ToString for Packet {
                 self.sender_name,
                 self.sender_host,
                 self.command_no,
-                "")
+                ext.as_ref().unwrap_or(&"".to_owned()))
     }
 }
 

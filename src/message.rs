@@ -15,13 +15,21 @@ pub fn send(socket: UdpSocket, tar_ip: &str, packet: Packet) {
             println!("{:x}发送上线通知消息", cmd);
             socket.set_broadcast(true).unwrap();
             let addr:String = format!("{}:{}", constant::IPMSG_LIMITED_BROADCAST, constant::IPMSG_DEFAULT_PORT);
+            println!("发送上线通知消息 --> {}", addr);
             socket.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
         }else if cmd == constant::IPMSG_ANSENTRY {
             println!("{:x}发送上线应答信息", cmd);
             socket.set_broadcast(false).unwrap();
             let addr:String = format!("{}:{}", tar_ip, constant::IPMSG_DEFAULT_PORT);
+            println!("发送上线应答信息 --> {}", addr);
             socket.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
-        }else {
+        }else if cmd == constant::IPMSG_RECVMSG {
+            println!("{:x}消息收到确认", cmd);
+            socket.set_broadcast(false).unwrap();
+            let addr:String = format!("{}:{}", tar_ip, constant::IPMSG_DEFAULT_PORT);
+            println!("消息收到确认 --> {}", addr);
+            socket.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
+        } else {
 
         }
     }
@@ -35,5 +43,12 @@ pub fn recevice(socket: UdpSocket, src_ip: &str, packet: Packet) {
         let ansentry_packet = Packet::new(constant::IPMSG_ANSENTRY, None);
         let sock_clone = socket.try_clone().unwrap();
         send(sock_clone, src_ip, ansentry_packet);
+    }else if constant::get_mode(packet.command_no) == constant::IPMSG_SENDMSG {
+        println!("收到发送的消息{}", src_ip);
+        let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
+        let sock_clone = socket.try_clone().unwrap();
+        send(sock_clone, src_ip, recvmsg);
+    }else {
+
     }
 }
