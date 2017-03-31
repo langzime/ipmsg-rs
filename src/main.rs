@@ -9,7 +9,6 @@ extern crate local_ip;
 mod constant;
 mod model;
 mod demons;
-mod message;
 
 
 use gtk::prelude::*;
@@ -22,10 +21,12 @@ use gtk_sys::*;
 
 use chrono::prelude::*;
 
-
+use std::sync::{Arc, Mutex};
 use std::thread;
+use std::sync::mpsc;
 use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use model::Packet;
 
 
 
@@ -37,9 +38,9 @@ fn main() {
 
     let window = gtk::Window::new(gtk::WindowType::Toplevel);
     window.set_title("飞鸽传书");
-    window.set_border_width(10);
+    //window.set_border_width(10);
     window.set_position(gtk::WindowPosition::Center);
-    window.set_default_size(350, 300);
+    window.set_default_size(200, 500);
     //window.set_resizable(false);
 
     window.connect_delete_event(|_, _| {
@@ -117,27 +118,41 @@ fn main() {
     window.show_all();
     gtk::main();*/
 
-    let grid = Grid::new();
+    //纵向
+    let v_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+
+    let menu_bar = MenuBar::new();
+    let sytem_item = MenuItem::new_with_label("系统");
+    menu_bar.append(&sytem_item);
+    let window_item = MenuItem::new_with_label("窗口");
+    menu_bar.append(&window_item);
+    let config_item = MenuItem::new_with_label("配置");
+    menu_bar.append(&config_item);
+
+    let label = Label::new("");
+
     let scrolled = ScrolledWindow::new(None, None);
     let tree = create_and_setup_view();
     let model = create_and_fill_model();
-    // Setting the model into the view.
     tree.set_model(Some(&model));
-    let button1 = gtk::Button::new_with_label("刷新11");
-    //grid.set_cell_width(100);
-    grid.attach(&tree, 0, 0, 4, 5);
-    grid.attach(&button1, 5, 2, 1, 1);
-    let text_view = gtk::TextView::new();
-    text_view.get_buffer().unwrap().set_text("啦啦啦啦\n啦啦啦啦\n啦啦啦啦");
-    //text_view.set_editable(false);
-    text_view.set_margin_top(10);
-    grid.attach(&text_view, 0, 6, 6, 1);
+    scrolled.add(&tree);
+    scrolled.set_min_content_height(450);
+    v_box.add(&menu_bar);
+    v_box.add(&scrolled);
+    v_box.add(&label);
 
+    tree.connect_cursor_changed(move |tree_view| {
+        let selection = tree_view.get_selection();
+        if let Some((model, iter)) = selection.get_selected() {
+            label.set_text(&format!("Hello '{}' from row {}",
+                                    model.get_value(&iter, 1).get::<String>().unwrap(),
+                                    model.get_value(&iter, 0).get::<u32>().unwrap()));
+        }
+    });
+
+    model.insert_with_values(None, &[0, 1, 2], &[&9, &"111", &"2222"]);
 
     let addr: String = format!("{}{}", "0.0.0.0:", constant::IPMSG_DEFAULT_PORT);
-
-
-    //let addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), constant::IPMSG_DEFAULT_PORT as u16));
 
     let socket: UdpSocket = match UdpSocket::bind(addr.as_str()) {
         Ok(s) => {
@@ -149,15 +164,21 @@ fn main() {
 
     let sock_clone0 = socket.try_clone().unwrap();
 
-    //启动守护线程
-    demons::start_demon(sock_clone0);
+    ///待处理消息队列
+    let (tx, rx): (mpsc::Sender<Packet>, mpsc::Receiver<Packet>) = mpsc::channel();
 
+    let tx_demon = tx.clone();
+    //启动守护线程
+    demons::start_daemon(sock_clone0, tx_demon);
     let sock_clone1 = socket.try_clone().unwrap();
+    demons::start_message_processer(sock_clone1, rx);
+
+    let sock_clone2 = socket.try_clone().unwrap();
 
     //启动发送上线消息
-    demons::send_ipmsg_br_entry(sock_clone1);
+    demons::send_ipmsg_br_entry(sock_clone2);
 
-    window.add(&grid);
+    window.add(&v_box);
     window.show_all();
     gtk::main();
 

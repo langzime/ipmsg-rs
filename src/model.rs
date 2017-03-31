@@ -18,6 +18,8 @@ pub struct Packet {
     pub command_no: u32,
     ///附加数据
     pub additional_section: Option<String>,
+    ///发送者ip
+    pub ip: String,
 }
 
 impl Packet {
@@ -33,6 +35,7 @@ impl Packet {
             sender_host: hostname.clone(),
             command_no: command_no,
             additional_section: additional_section,
+            ip: "".to_owned(),
         }
     }
 
@@ -45,6 +48,7 @@ impl Packet {
             sender_host: sender_host,
             command_no: command_no,
             additional_section: additional_section,
+            ip: "".to_owned(),
         }
     }
 }
