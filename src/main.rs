@@ -1,9 +1,11 @@
 
 extern crate gtk;
 extern crate gtk_sys;
+extern crate glib;
 extern crate chrono;
 extern crate hostname;
 extern crate local_ip;
+extern crate encoding;
 
 
 mod constant;
@@ -22,13 +24,12 @@ use gtk_sys::*;
 use chrono::prelude::*;
 
 use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
 use std::thread;
 use std::sync::mpsc;
 use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use model::Packet;
-
-
 
 fn main() {
     if gtk::init().is_err() {
@@ -150,7 +151,14 @@ fn main() {
         }
     });
 
-    model.insert_with_values(None, &[0, 1, 2], &[&9, &"111", &"2222"]);
+    //model.insert_with_values(None, &[0, 1, 2], &[&9, &"111", &"2222"]);
+
+    let (tx1, rx1) = mpsc::channel();
+    let new_user_sender = tx1.clone();
+    // put ListStore and receiver in thread local storage
+    demons::GLOBAL.with(move |global| {
+        *global.borrow_mut() = Some((model, rx1))
+    });
 
     let addr: String = format!("{}{}", "0.0.0.0:", constant::IPMSG_DEFAULT_PORT);
 
@@ -171,7 +179,7 @@ fn main() {
     //启动守护线程
     demons::start_daemon(sock_clone0, tx_demon);
     let sock_clone1 = socket.try_clone().unwrap();
-    demons::start_message_processer(sock_clone1, rx);
+    demons::start_message_processer(sock_clone1, rx, new_user_sender);
 
     let sock_clone2 = socket.try_clone().unwrap();
 
