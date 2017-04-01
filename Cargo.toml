@@ -12,5 +12,5 @@ local-ip = "0.1.0"
 encoding = "0.2.33"
 
 [dependencies.gtk]
-gtk = "0.1.2"
+gtk = { git = "https://github.com/gtk-rs/gtk.git" }
 features = ["v3_22"]

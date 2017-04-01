@@ -19,7 +19,6 @@ use gtk::{
     WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
     ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment,
 };
-use gtk_sys::*;
 
 use chrono::prelude::*;
 
@@ -147,11 +146,9 @@ fn main() {
         if let Some((model, iter)) = selection.get_selected() {
             label.set_text(&format!("Hello '{}' from row {}",
                                     model.get_value(&iter, 1).get::<String>().unwrap(),
-                                    model.get_value(&iter, 0).get::<u32>().unwrap()));
+                                    model.get_value(&iter, 0).get::<String>().unwrap()));
         }
     });
-
-    //model.insert_with_values(None, &[0, 1, 2], &[&9, &"111", &"2222"]);
 
     let (tx1, rx1) = mpsc::channel();
     let new_user_sender = tx1.clone();
@@ -218,12 +215,12 @@ fn append_column(tree: &TreeView, id: i32, title: &str) {
 
 fn create_and_fill_model() -> ListStore {
     // Creation of a model with two rows.
-    let model = ListStore::new(&[u32::static_type(), String::static_type(), String::static_type()]);
+    let model = ListStore::new(&[String::static_type(), String::static_type(), String::static_type()]);
 
     // Filling up the tree view.
-    let entries = &[("啦啦啦", "11"), ("啦啦啦", "22"), ("啦啦啦", "33"), ("啦啦啦", "44"), ("啦啦啦", "55"), ("啦啦啦", "66"), ("啦啦啦", "77"), ("啦啦啦", "88")];
+    /*let entries = &[("啦啦啦", "11"), ("啦啦啦", "22"), ("啦啦啦", "33"), ("啦啦啦", "44"), ("啦啦啦", "55"), ("啦啦啦", "66"), ("啦啦啦", "77"), ("啦啦啦", "88")];
     for (i, entry) in entries.iter().enumerate() {
         model.insert_with_values(None, &[0, 1, 2], &[&(i as u32 + 1), &entry.0, &entry.1]);
-    }
+    }*/
     model
 }

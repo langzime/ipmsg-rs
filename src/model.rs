@@ -68,3 +68,22 @@ impl ToString for Packet {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct User {
+    pub name: String,
+    pub host: String,
+    pub ip: String,
+    pub group: String,
+}
+
+impl User {
+    pub fn new(name :String, host :String, ip :String, group :String) -> User {
+        User{
+            name: name,
+            host: host,
+            ip: ip,
+            group: group,
+        }
+    }
+}
+

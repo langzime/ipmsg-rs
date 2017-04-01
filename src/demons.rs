@@ -7,6 +7,8 @@ use std::sync::mpsc;
 
 use gtk::ListStore;
 use constant;
+use model;
+use model::User;
 use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
@@ -60,7 +62,7 @@ pub fn start_daemon(socket: UdpSocket, sender: mpsc::Sender<Packet>){
 }
 
 ///信息处理
-pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<String>){
+pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<User>){
     thread::spawn(move || {
         loop {
             let packet = receiver.recv().unwrap();
@@ -68,7 +70,7 @@ pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packe
             let cmd = constant::get_mode(packet.command_no);
             let extstr: String = packet.additional_section.unwrap();
             let ext_vec: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
-            println!("我是明文消息 {:?}", ext_vec);
+            println!("我是扩展消息 {:?}", ext_vec);
             println!("命令位 {:x} 扩展位{:x}", cmd, opt);
             let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
             if opt&constant::IPMSG_SENDCHECKOPT != 0 {
@@ -79,7 +81,8 @@ pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packe
                 let ansentry_packet = Packet::new(constant::IPMSG_ANSENTRY, None);
                 socket.set_broadcast(false).unwrap();
                 socket.send_to(ansentry_packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
-                sender.send("111".to_owned());
+                let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
+                sender.send(user);
                 ::glib::idle_add(receive);
             }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
                 if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
@@ -99,8 +102,8 @@ pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packe
 fn receive() -> ::glib::Continue {
     GLOBAL.with(|global| {
         if let Some((ref store, ref rx)) = *global.borrow() {
-            if let Ok(str) = rx.try_recv() {
-                store.insert_with_values(None, &[0, 1, 2], &[&9, &"111", &"2222"]);
+            if let Ok(user) = rx.try_recv() {
+                store.insert_with_values(None, &[0, 1, 2], &[&&user.name, &&user.group, &&user.host]);
             }
         }
     });
@@ -108,5 +111,5 @@ fn receive() -> ::glib::Continue {
 }
 
 thread_local!(
-    pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<String>)>> = RefCell::new(None)
+    pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<User>)>> = RefCell::new(None)
 );
