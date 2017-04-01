@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["dujiajiyi"]
 
 [dependencies]
-gtk-sys = "0.3.3"
 glib = "0.1.2"
 chrono = "0.3.0"
 hostname = "0.1.3"
