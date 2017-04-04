@@ -87,3 +87,22 @@ impl User {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Operate {
+    ADD, REMOVE
+}
+
+#[derive(Clone, Debug)]
+pub struct OperUser{
+    pub user :User,
+    pub oper: Operate,
+}
+
+impl OperUser {
+    pub fn new(user: User, oper :Operate) -> OperUser{
+        OperUser{
+            user: user,
+            oper: oper,
+        }
+    }
+}

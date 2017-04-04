@@ -8,11 +8,12 @@ use std::sync::mpsc;
 use gtk::ListStore;
 use constant;
 use model;
-use model::User;
+use model::{User, OperUser, Operate};
 use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use std::cell::RefCell;
+use gtk::TreeModelExt;
 
 ///启动发送上线消息
 pub fn send_ipmsg_br_entry(socket: UdpSocket){
@@ -62,7 +63,7 @@ pub fn start_daemon(socket: UdpSocket, sender: mpsc::Sender<Packet>){
 }
 
 ///信息处理
-pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<User>){
+pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>){
     thread::spawn(move || {
         loop {
             let packet = receiver.recv().unwrap();
@@ -82,7 +83,7 @@ pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packe
                 socket.set_broadcast(false).unwrap();
                 socket.send_to(ansentry_packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
                 let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
-                sender.send(user);
+                sender.send(OperUser::new(user, Operate::ADD));
                 ::glib::idle_add(receive);
             }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
                 if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
@@ -102,8 +103,65 @@ pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packe
 fn receive() -> ::glib::Continue {
     GLOBAL.with(|global| {
         if let Some((ref store, ref rx)) = *global.borrow() {
-            if let Ok(user) = rx.try_recv() {
-                store.insert_with_values(None, &[0, 1, 2], &[&&user.name, &&user.group, &&user.host]);
+            if let Ok(op_user) = rx.try_recv() {
+//                let new_iter = &store.append();
+//                store.set(new_iter, &[0, 1, 2], &[&&op_user.user.name, &&op_user.user.group, &&op_user.user.host]);
+//                println!("{:?}", store.get_string_from_iter(new_iter));
+//                let iter = store.insert_with_values(None, &[0, 1, 2, 3], &[&&op_user.user.name, &&op_user.user.group, &&op_user.user.host, &&op_user.user.ip]);
+//                println!("{:?}", store.get_string_from_iter(&iter));
+//                store.remove(&new_iter);
+//                println!("{:?}", store.get_value(&store.get_iter_from_string("0").unwrap(), 3).get::<String>().unwrap());
+
+                let income_user = op_user.user;
+                let oper = op_user.oper;
+                if oper == Operate::ADD {
+                    let mut in_flag = false;
+                    if let Some(first) = store.get_iter_first(){//拿出来第一条
+                        let mut num :u32 = store.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                        let ip = store.get_value(&first, 3).get::<String>().unwrap();//获取ip
+                        if ip == income_user.ip {
+                            in_flag = true;
+                        }else {
+                            loop {
+                                num = num + 1;
+                                if let Some(next_iter) = store.get_iter_from_string(&num.to_string()){
+                                    let next_ip = store.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
+                                    if next_ip == income_user.ip {
+                                        in_flag = true;
+                                        break;
+                                    }
+                                }else{
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if !in_flag {
+                        store.insert_with_values(None, &[0, 1, 2, 3], &[&&income_user.name, &&income_user.group, &&income_user.host, &&income_user.ip]);
+                    }
+                }
+                if oper == Operate::REMOVE {
+                    if let Some(first) = store.get_iter_first(){//拿出来第一条
+                        let mut num :u32 = store.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                        let ip = store.get_value(&first, 3).get::<String>().unwrap();//获取ip
+                        if ip == income_user.ip {
+                            store.remove(&first);
+                        }else {
+                            loop {
+                                num = num + 1;
+                                if let Some(next_iter) = store.get_iter_from_string(&num.to_string()){
+                                    let next_ip = store.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
+                                    if next_ip == income_user.ip {
+                                        store.remove(&next_iter);
+                                        break;
+                                    }
+                                }else{
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     });
@@ -111,5 +169,5 @@ fn receive() -> ::glib::Continue {
 }
 
 thread_local!(
-    pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<User>)>> = RefCell::new(None)
+    pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None)
 );
