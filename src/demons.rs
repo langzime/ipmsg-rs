@@ -78,7 +78,11 @@ pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packe
                 let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
                 socket.send_to(recvmsg.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
             }
-            if cmd == constant::IPMSG_BR_ENTRY {//收到上线通知消息
+            if cmd == constant::IPMSG_BR_EXIT {//收到上线通知消息
+                let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
+                sender.send(OperUser::new(user, Operate::REMOVE));
+                ::glib::idle_add(receive);
+            } else if cmd == constant::IPMSG_BR_ENTRY {//收到上线通知消息
                 let ansentry_packet = Packet::new(constant::IPMSG_ANSENTRY, None);
                 socket.set_broadcast(false).unwrap();
                 socket.send_to(ansentry_packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
@@ -104,14 +108,6 @@ fn receive() -> ::glib::Continue {
     GLOBAL.with(|global| {
         if let Some((ref store, ref rx)) = *global.borrow() {
             if let Ok(op_user) = rx.try_recv() {
-//                let new_iter = &store.append();
-//                store.set(new_iter, &[0, 1, 2], &[&&op_user.user.name, &&op_user.user.group, &&op_user.user.host]);
-//                println!("{:?}", store.get_string_from_iter(new_iter));
-//                let iter = store.insert_with_values(None, &[0, 1, 2, 3], &[&&op_user.user.name, &&op_user.user.group, &&op_user.user.host, &&op_user.user.ip]);
-//                println!("{:?}", store.get_string_from_iter(&iter));
-//                store.remove(&new_iter);
-//                println!("{:?}", store.get_value(&store.get_iter_from_string("0").unwrap(), 3).get::<String>().unwrap());
-
                 let income_user = op_user.user;
                 let oper = op_user.oper;
                 if oper == Operate::ADD {
