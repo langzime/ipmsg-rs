@@ -5,11 +5,15 @@ extern crate chrono;
 extern crate hostname;
 extern crate local_ip;
 extern crate encoding;
+#[macro_use]
+extern crate lazy_static;
 
 
 mod constant;
 mod model;
 mod demons;
+mod message;
+//mod app;
 
 
 use gtk::prelude::*;
@@ -35,7 +39,7 @@ fn main() {
         return;
     }
 
-    let window = gtk::Window::new(gtk::WindowType::Toplevel);
+    let window = Window::new(gtk::WindowType::Toplevel);
     window.set_title("飞鸽传书");
     //window.set_border_width(10);
     window.set_position(gtk::WindowPosition::Center);
@@ -73,9 +77,28 @@ fn main() {
     tree.connect_cursor_changed(move |tree_view| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
-            label.set_text(&format!("Hello '{}' from row {}",
-                                    model.get_value(&iter, 1).get::<String>().unwrap(),
-                                    model.get_value(&iter, 0).get::<String>().unwrap()));
+            &label.set_text(&format!("-- {} --", model.get_value(&iter, 0).get::<String>().unwrap()));
+        }
+    });
+
+    tree.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
+        let selection = tree_view.get_selection();
+        if let Some((model, iter)) = selection.get_selected() {
+            let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
+            let name = model.get_value(&iter, 0).get::<String>().unwrap();
+            let chat_title = &format!("和{}({})聊天窗口", name, ip_str);
+            let chat_window = Window::new(gtk::WindowType::Toplevel);
+            chat_window.set_title(chat_title);
+            chat_window.set_position(gtk::WindowPosition::Center);
+            chat_window.set_default_size(450, 500);
+            let v_chat_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            let text_view = gtk::TextView::new();
+            let scroll = gtk::ScrolledWindow::new(None, None);
+            scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+            scroll.add(&text_view);
+            v_chat_box.add(&scroll);
+            chat_window.add(&v_chat_box);
+            chat_window.show_all();
         }
     });
 
@@ -110,12 +133,12 @@ fn main() {
     let sock_clone2 = socket.try_clone().unwrap();
 
     //启动发送上线消息
-    demons::send_ipmsg_br_entry(sock_clone2);
+    message::send_ipmsg_br_entry(sock_clone2);
 
     window.add(&v_box);
     window.show_all();
+    //app::spwan();
     gtk::main();
-
 }
 
 fn create_and_setup_view() -> TreeView {

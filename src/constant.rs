@@ -119,8 +119,19 @@ pub fn get_opt(command: u32) -> u32 {
 
 use std::net::IpAddr;
 
+///得到本地ip
 pub fn get_local_ip() -> Option<IpAddr> {
     ::local_ip::get()
+}
+
+///得到主机名
+pub fn get_home_name() -> Option<String> {
+    ::hostname::get_hostname()
+}
+
+lazy_static! {
+    pub static ref homename: String = get_home_name().unwrap();
+    pub static ref localip: String = get_local_ip().unwrap().to_string();
 }
 
 
