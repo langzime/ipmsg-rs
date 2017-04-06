@@ -119,21 +119,20 @@ fn main() {
         Err(e) => panic!("couldn't bind socket: {}", e)
     };
 
-    let sock_clone0 = socket.try_clone().unwrap();
+    ::demons::GLOBAL_UDPSOCKET.with(move |global| {
+        *global.borrow_mut() = Some(socket.try_clone().unwrap());
+    });
 
     ///待处理消息队列
     let (tx, rx): (mpsc::Sender<Packet>, mpsc::Receiver<Packet>) = mpsc::channel();
 
     let tx_demon = tx.clone();
-    //启动守护线程
-    demons::start_daemon(sock_clone0, tx_demon);
-    let sock_clone1 = socket.try_clone().unwrap();
-    demons::start_message_processer(sock_clone1, rx, new_user_sender);
-
-    let sock_clone2 = socket.try_clone().unwrap();
-
+    //接收消息守护线程
+    demons::start_daemon(tx_demon);
+    //消息处理守护线程
+    demons::start_message_processer(rx, new_user_sender);
     //启动发送上线消息
-    message::send_ipmsg_br_entry(sock_clone2);
+    message::send_ipmsg_br_entry();
 
     window.add(&v_box);
     window.show_all();

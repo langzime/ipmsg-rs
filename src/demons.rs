@@ -17,80 +17,90 @@ use gtk::TreeModelExt;
 
 
 ///启动消息监听线程
-pub fn start_daemon(socket: UdpSocket, sender: mpsc::Sender<Packet>){
-    thread::spawn(move||{
-        loop {
-            let mut buf = [0; 2048];
-            match socket.recv_from(&mut buf) {
-                Ok((amt, src)) => {
-                    //let receive_str = unsafe { str::from_utf8_unchecked(&buf[0..amt])};
-                    //todo 默认是用中文编码 还没想到怎么做兼容
-                    let receive_str = GB18030.decode(&buf[0..amt], DecoderTrap::Strict).unwrap();
-                    println!("收到原始信息 -> {} 来自 ip -> {}", receive_str, src.ip());
-                    let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
-                    if v.len() > 4 {
-                        let mut packet = Packet::from(String::from(v[0]),
-                                                 String::from(v[1]),
-                                                 String::from(v[2]),
-                                                 String::from(v[3]),
-                                                 v[4].parse::<u32>().unwrap(),
-                                                 None
-                        );
-                        if v.len() > 5 {
-                            packet.additional_section = Some(String::from(v[5]));
+pub fn start_daemon(sender: mpsc::Sender<Packet>){
+    ::demons::GLOBAL_UDPSOCKET.with(|global| {
+        if let Some(ref socket) = *global.borrow() {
+            let socket_clone = socket.try_clone().unwrap();
+            thread::spawn(move||{
+                loop {
+                    let mut buf = [0; 2048];
+                    match socket_clone.recv_from(&mut buf) {
+                        Ok((amt, src)) => {
+                            //let receive_str = unsafe { str::from_utf8_unchecked(&buf[0..amt])};
+                            //todo 默认是用中文编码 还没想到怎么做兼容
+                            let receive_str = GB18030.decode(&buf[0..amt], DecoderTrap::Strict).unwrap();
+                            println!("收到原始信息 -> {} 来自 ip -> {}", receive_str, src.ip());
+                            let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
+                            if v.len() > 4 {
+                                let mut packet = Packet::from(String::from(v[0]),
+                                                              String::from(v[1]),
+                                                              String::from(v[2]),
+                                                              String::from(v[3]),
+                                                              v[4].parse::<u32>().unwrap(),
+                                                              None
+                                );
+                                if v.len() > 5 {
+                                    packet.additional_section = Some(String::from(v[5]));
+                                }
+                                packet.ip = src.ip().to_string();
+                                sender.send(packet);
+                            }else {
+                                println!("Invalid packet {} !", receive_str);
+                            }
+                        },
+                        Err(e) => {
+                            println!("couldn't recieve a datagram: {}", e);
                         }
-                        packet.ip = src.ip().to_string();
-                        sender.send(packet);
-                    }else {
-                        println!("Invalid packet {} !", receive_str);
                     }
-                },
-                Err(e) => {
-                    println!("couldn't recieve a datagram: {}", e);
                 }
-            }
+            });
         }
     });
 }
 
 ///信息处理
-pub fn start_message_processer(socket: UdpSocket, receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>){
-    thread::spawn(move || {
-        loop {
-            let packet = receiver.recv().unwrap();
-            let opt = constant::get_opt(packet.command_no);
-            let cmd = constant::get_mode(packet.command_no);
-            let extstr: String = packet.additional_section.unwrap();
-            let ext_vec: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
-            println!("我是扩展消息 {:?}", ext_vec);
-            println!("命令位 {:x} 扩展位{:x}", cmd, opt);
-            let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
-            if opt&constant::IPMSG_SENDCHECKOPT != 0 {
-                let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
-                socket.send_to(recvmsg.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
-            }
-            if cmd == constant::IPMSG_BR_EXIT {//收到上线通知消息
-                let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
-                sender.send(OperUser::new(user, Operate::REMOVE));
-                ::glib::idle_add(receive);
-            } else if cmd == constant::IPMSG_BR_ENTRY {//收到上线通知消息
-                let ansentry_packet = Packet::new(constant::IPMSG_ANSENTRY, None);
-                socket.set_broadcast(false).unwrap();
-                socket.send_to(ansentry_packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
-                let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
-                sender.send(OperUser::new(user, Operate::ADD));
-                ::glib::idle_add(receive);
-            }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
-                if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
-                    println!("我是密封消息");
-                } else {
-                    //let extstr: String = packet.additional_section.unwrap();
-                    //let v: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
-                    //println!("我是明文消息 {:?}", v);println!("我是明文消息 {:?}", v);
-                }
-            }else {
+pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>){
+    ::demons::GLOBAL_UDPSOCKET.with(|global| {
+        if let Some(ref socket) = *global.borrow() {
+            let socket_clone = socket.try_clone().unwrap();
+            thread::spawn(move || {
+                loop {
+                    let packet = receiver.recv().unwrap();
+                    let opt = constant::get_opt(packet.command_no);
+                    let cmd = constant::get_mode(packet.command_no);
+                    let extstr: String = packet.additional_section.unwrap();
+                    let ext_vec: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                    println!("我是扩展消息 {:?}", ext_vec);
+                    println!("命令位 {:x} 扩展位{:x}", cmd, opt);
+                    let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
+                    if opt&constant::IPMSG_SENDCHECKOPT != 0 {
+                        let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
+                        socket_clone.send_to(recvmsg.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
+                    }
+                    if cmd == constant::IPMSG_BR_EXIT {//收到上线通知消息
+                        let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
+                        sender.send(OperUser::new(user, Operate::REMOVE));
+                        ::glib::idle_add(receive);
+                    } else if cmd == constant::IPMSG_BR_ENTRY {//收到上线通知消息
+                        let ansentry_packet = Packet::new(constant::IPMSG_ANSENTRY, None);
+                        socket_clone.set_broadcast(false).unwrap();
+                        socket_clone.send_to(ansentry_packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
+                        let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
+                        sender.send(OperUser::new(user, Operate::ADD));
+                        ::glib::idle_add(receive);
+                    }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
+                        if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
+                            println!("我是密封消息");
+                        } else {
+                            //let extstr: String = packet.additional_section.unwrap();
+                            //let v: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                            //println!("我是明文消息 {:?}", v);println!("我是明文消息 {:?}", v);
+                        }
+                    }else {
 
-            }
+                    }
+                }
+            });
         }
     });
 }
