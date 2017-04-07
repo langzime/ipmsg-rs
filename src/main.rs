@@ -41,7 +41,6 @@ fn main() {
 
     let window = Window::new(gtk::WindowType::Toplevel);
     window.set_title("飞鸽传书");
-    //window.set_border_width(10);
     window.set_position(gtk::WindowPosition::Center);
     window.set_default_size(200, 500);
     window.set_resizable(false);
@@ -65,6 +64,7 @@ fn main() {
     let label = Label::new("");
 
     let scrolled = ScrolledWindow::new(None, None);
+    scrolled.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     let tree = create_and_setup_view();
     let model = create_and_fill_model();
     tree.set_model(Some(&model));
@@ -89,24 +89,41 @@ fn main() {
             let chat_title = &format!("和{}({})聊天窗口", name, ip_str);
             let chat_window = Window::new(gtk::WindowType::Toplevel);
             chat_window.set_title(chat_title);
+            chat_window.set_border_width(10);
             chat_window.set_position(gtk::WindowPosition::Center);
             chat_window.set_default_size(450, 500);
             let v_chat_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            let h_button_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            let button1 = gtk::Button::new_with_label("清空");
+            let button2 = gtk::Button::new_with_label("发送");
+            h_button_box.add(&button1);
+            h_button_box.add(&button2);
             let text_view = gtk::TextView::new();
             let scroll = gtk::ScrolledWindow::new(None, None);
             scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+            scroll.set_min_content_height(350);
+            text_view.set_editable(false);
             scroll.add(&text_view);
+
+            let text_view_presend = gtk::TextView::new();
+            let scroll1 = gtk::ScrolledWindow::new(None, None);
+            scroll1.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+            scroll1.set_margin_top(10);
+            scroll1.set_min_content_height(80);
+            scroll1.add(&text_view_presend);
             v_chat_box.add(&scroll);
+            v_chat_box.add(&scroll1);
+            v_chat_box.add(&h_button_box);
             chat_window.add(&v_chat_box);
             chat_window.show_all();
         }
     });
 
-    let (tx1, rx1) = mpsc::channel();
-    let new_user_sender = tx1.clone();
+    let (user_add_sender, user_list_receiver) = mpsc::channel();
+    let new_user_sender_clone = user_add_sender.clone();
     // put ListStore and receiver in thread local storage
     demons::GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((model, rx1))
+        *global.borrow_mut() = Some((model, user_list_receiver))
     });
 
     let addr: String = format!("{}{}", "0.0.0.0:", constant::IPMSG_DEFAULT_PORT);
@@ -124,13 +141,13 @@ fn main() {
     });
 
     ///待处理消息队列
-    let (tx, rx): (mpsc::Sender<Packet>, mpsc::Receiver<Packet>) = mpsc::channel();
+    let (packet_sender, packet_receiver): (mpsc::Sender<Packet>, mpsc::Receiver<Packet>) = mpsc::channel();
 
-    let tx_demon = tx.clone();
+    let packet_sender_clone = packet_sender.clone();
     //接收消息守护线程
-    demons::start_daemon(tx_demon);
+    demons::start_daemon(packet_sender_clone);
     //消息处理守护线程
-    demons::start_message_processer(rx, new_user_sender);
+    demons::start_message_processer(packet_receiver, new_user_sender_clone);
     //启动发送上线消息
     message::send_ipmsg_br_entry();
 
