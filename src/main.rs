@@ -13,6 +13,7 @@ mod constant;
 mod model;
 mod demons;
 mod message;
+mod util;
 //mod app;
 
 
@@ -89,7 +90,7 @@ fn main() {
             let chat_title = &format!("和{}({})聊天窗口", name, ip_str);
             let chat_window = Window::new(gtk::WindowType::Toplevel);
             chat_window.set_title(chat_title);
-            chat_window.set_border_width(10);
+            chat_window.set_border_width(5);
             chat_window.set_position(gtk::WindowPosition::Center);
             chat_window.set_default_size(450, 500);
             let v_chat_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -115,6 +116,12 @@ fn main() {
             v_chat_box.add(&scroll1);
             v_chat_box.add(&h_button_box);
             chat_window.add(&v_chat_box);
+            button2.connect_clicked(move|_|{
+                let start_iter = &text_view_presend.get_buffer().unwrap().get_start_iter();
+                let end_iter = &text_view_presend.get_buffer().unwrap().get_end_iter();
+                let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
+                message::send_ipmsg(context.to_owned(), ip_str.clone());
+            });
             chat_window.show_all();
         }
     });
