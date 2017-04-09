@@ -101,7 +101,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                             println!("我是密封消息");
                         } else {
                             let packet_clone = packet.clone();
-                            remained_sender.send(((packet.sender_name, packet.sender_host), Some(packet_clone)));
+                            remained_sender.send(((packet.sender_name, packet.ip), Some(packet_clone)));
                             ::glib::idle_add(create_or_open_chat);
                             //let extstr: String = packet.additional_section.unwrap();
                             //let v: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
@@ -119,15 +119,15 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
 pub fn create_or_open_chat() -> ::glib::Continue {
     GLOBAL_WINDOWS.with(|global| {
         if let Some((ref mut map, ref rx)) = *global.borrow_mut() {
-            if let Ok(((name, host), packet)) = rx.try_recv() {
+            if let Ok(((name, host_ip), packet)) = rx.try_recv() {
                 println!("{:?}", packet);
                 let select_map = map.clone();
-                if !host.is_empty(){
-                    if let Some(win) = select_map.get(&host) {
-                        println!("已经存在了{:?}", win);
+                if !host_ip.is_empty(){
+                    if let Some(win) = select_map.get(&host_ip) {
+                        println!("已经存在了");
                         //win
                     }else {
-                        let chat_title = &format!("和{}({})聊天窗口", name, host);
+                        let chat_title = &format!("和{}({})聊天窗口", name, host_ip);
                         let chat_window = Window::new(::gtk::WindowType::Toplevel);
                         chat_window.set_title(chat_title);
                         chat_window.set_border_width(5);
@@ -157,9 +157,9 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         v_chat_box.add(&scroll1);
                         v_chat_box.add(&h_button_box);
                         chat_window.add(&v_chat_box);
-                        let ip_str_1 = host.clone();
-                        let ip_str_2 = host.clone();
-                        let ip_str_3 = host.clone();
+                        let ip_str_1 = host_ip.clone();
+                        let ip_str_2 = host_ip.clone();
+                        let ip_str_3 = host_ip.clone();
                         button2.connect_clicked(move|_|{
                             let start_iter = &text_view_presend.get_buffer().unwrap().get_start_iter();
                             let end_iter = &text_view_presend.get_buffer().unwrap().get_end_iter();
