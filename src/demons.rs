@@ -4,8 +4,9 @@ use std::thread;
 use model::Packet;
 use std::net::UdpSocket;
 use std::sync::mpsc;
+use std::collections::HashMap;
 
-use gtk::ListStore;
+use gtk::{ListStore, Window};
 use constant;
 use model;
 use model::{User, OperUser, Operate};
@@ -77,7 +78,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
                         socket_clone.send_to(recvmsg.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
                     }
-                    if cmd == constant::IPMSG_BR_EXIT {//收到上线通知消息
+                    if cmd == constant::IPMSG_BR_EXIT {//收到下线通知消息
                         let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
                         sender.send(OperUser::new(user, Operate::REMOVE));
                         ::glib::idle_add(receive);
@@ -168,4 +169,5 @@ fn receive() -> ::glib::Continue {
 thread_local!(
     pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//UdpSocket
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);
+    pub static GLOBAL_WINDOWS: RefCell<Option<HashMap<String, Window>>> = RefCell::new(Some(HashMap::new()));
 );

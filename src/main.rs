@@ -103,6 +103,7 @@ fn main() {
             let scroll = gtk::ScrolledWindow::new(None, None);
             scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
             scroll.set_min_content_height(350);
+            text_view.set_cursor_visible(false);
             text_view.set_editable(false);
             scroll.add(&text_view);
 
@@ -116,13 +117,32 @@ fn main() {
             v_chat_box.add(&scroll1);
             v_chat_box.add(&h_button_box);
             chat_window.add(&v_chat_box);
+            let ip_str_1 = ip_str.clone();
+            let ip_str_2 = ip_str.clone();
+            let ip_str_3 = ip_str.clone();
             button2.connect_clicked(move|_|{
                 let start_iter = &text_view_presend.get_buffer().unwrap().get_start_iter();
                 let end_iter = &text_view_presend.get_buffer().unwrap().get_end_iter();
                 let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
-                message::send_ipmsg(context.to_owned(), ip_str.clone());
+                message::send_ipmsg(context.to_owned(), ip_str_1.clone());
+                &text_view.get_buffer().unwrap().set_text(context);
+                &text_view_presend.get_buffer().unwrap().set_text("");
             });
             chat_window.show_all();
+            chat_window.connect_delete_event(move|_, _| {
+                demons::GLOBAL_WINDOWS.with(|global| {
+                    if let Some(ref mut map) = *global.borrow_mut() {
+                        map.remove(&ip_str_3);
+                    }
+                });
+                Inhibit(false)
+            });
+            let clone_chat = chat_window.clone();
+            demons::GLOBAL_WINDOWS.with(move |global| {
+                if let Some(ref mut map) = *global.borrow_mut() {
+                    map.insert(ip_str_2, clone_chat);
+                }
+            });
         }
     });
 
