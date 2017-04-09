@@ -6,7 +6,6 @@ use std::net::UdpSocket;
 use std::sync::mpsc;
 use std::collections::HashMap;
 
-use gtk::{ListStore, Window};
 use constant;
 use model;
 use model::{User, OperUser, Operate};
@@ -14,7 +13,15 @@ use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use std::cell::RefCell;
+use gtk;
 use gtk::TreeModelExt;
+use gtk::prelude::*;
+use gtk::{
+    CellRendererText, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
+    WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
+    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment,
+};
+use message;
 
 
 ///启动消息监听线程
@@ -60,18 +67,18 @@ pub fn start_daemon(sender: mpsc::Sender<Packet>){
 }
 
 ///信息处理
-pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>){
+pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>, remained_sender :mpsc::Sender<((String, String), Option<Packet>)>){
     ::demons::GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
             thread::spawn(move || {
                 loop {
-                    let packet = receiver.recv().unwrap();
+                    let packet: Packet = receiver.recv().unwrap();
                     let opt = constant::get_opt(packet.command_no);
                     let cmd = constant::get_mode(packet.command_no);
-                    let extstr: String = packet.additional_section.unwrap();
-                    let ext_vec: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
-                    println!("我是扩展消息 {:?}", ext_vec);
+                    //let extstr: String = packet.additional_section.unwrap();
+                    //let ext_vec: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                    //println!("我是扩展消息 {:?}", ext_vec);
                     println!("命令位 {:x} 扩展位{:x}", cmd, opt);
                     let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
                     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
@@ -93,6 +100,9 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
                             println!("我是密封消息");
                         } else {
+                            let packet_clone = packet.clone();
+                            remained_sender.send(((packet.sender_name, packet.sender_host), Some(packet_clone)));
+                            ::glib::idle_add(create_or_open_chat);
                             //let extstr: String = packet.additional_section.unwrap();
                             //let v: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
                             //println!("我是明文消息 {:?}", v);println!("我是明文消息 {:?}", v);
@@ -104,6 +114,77 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
             });
         }
     });
+}
+
+pub fn create_or_open_chat() -> ::glib::Continue {
+    GLOBAL_WINDOWS.with(|global| {
+        if let Some((ref mut map, ref rx)) = *global.borrow_mut() {
+            if let Ok(((name, host), packet)) = rx.try_recv() {
+                println!("{:?}", packet);
+                let select_map = map.clone();
+                if !host.is_empty(){
+                    if let Some(win) = select_map.get(&host) {
+                        println!("已经存在了{:?}", win);
+                        //win
+                    }else {
+                        let chat_title = &format!("和{}({})聊天窗口", name, host);
+                        let chat_window = Window::new(::gtk::WindowType::Toplevel);
+                        chat_window.set_title(chat_title);
+                        chat_window.set_border_width(5);
+                        chat_window.set_position(::gtk::WindowPosition::Center);
+                        chat_window.set_default_size(450, 500);
+                        let v_chat_box = gtk::Box::new(::gtk::Orientation::Vertical, 0);
+                        let h_button_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                        let button1 = gtk::Button::new_with_label("清空");
+                        let button2 = gtk::Button::new_with_label("发送");
+                        h_button_box.add(&button1);
+                        h_button_box.add(&button2);
+                        let text_view = gtk::TextView::new();
+                        let scroll = gtk::ScrolledWindow::new(None, None);
+                        scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+                        scroll.set_min_content_height(350);
+                        text_view.set_cursor_visible(false);
+                        text_view.set_editable(false);
+                        scroll.add(&text_view);
+
+                        let text_view_presend = gtk::TextView::new();
+                        let scroll1 = gtk::ScrolledWindow::new(None, None);
+                        scroll1.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+                        scroll1.set_margin_top(10);
+                        scroll1.set_min_content_height(80);
+                        scroll1.add(&text_view_presend);
+                        v_chat_box.add(&scroll);
+                        v_chat_box.add(&scroll1);
+                        v_chat_box.add(&h_button_box);
+                        chat_window.add(&v_chat_box);
+                        let ip_str_1 = host.clone();
+                        let ip_str_2 = host.clone();
+                        let ip_str_3 = host.clone();
+                        button2.connect_clicked(move|_|{
+                            let start_iter = &text_view_presend.get_buffer().unwrap().get_start_iter();
+                            let end_iter = &text_view_presend.get_buffer().unwrap().get_end_iter();
+                            let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
+                            message::send_ipmsg(context.to_owned(), ip_str_1.clone());
+                            &text_view.get_buffer().unwrap().set_text(context);
+                            &text_view_presend.get_buffer().unwrap().set_text("");
+                        });
+                        chat_window.show_all();
+                        chat_window.connect_delete_event(move|_, _| {
+                            GLOBAL_WINDOWS.with(|global| {
+                                if let Some((ref mut map1, _)) = *global.borrow_mut() {
+                                    map1.remove(&ip_str_3);
+                                }
+                            });
+                            Inhibit(false)
+                        });
+                        let clone_chat = chat_window.clone();
+                        map.insert(ip_str_2, clone_chat);
+                    }
+                }
+            }
+        }
+    });
+    ::glib::Continue(false)
 }
 
 fn receive() -> ::glib::Continue {
@@ -169,5 +250,5 @@ fn receive() -> ::glib::Continue {
 thread_local!(
     pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//UdpSocket
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);
-    pub static GLOBAL_WINDOWS: RefCell<Option<HashMap<String, Window>>> = RefCell::new(Some(HashMap::new()));
+    pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, Window>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);
 );
