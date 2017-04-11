@@ -123,8 +123,9 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                 println!("{:?}", packet);
                 let select_map = map.clone();
                 if !host_ip.is_empty(){
-                    if let Some(win) = select_map.get(&host_ip) {
+                    if let Some(chat_win) = select_map.get(&host_ip) {
                         println!("已经存在了");
+                        chat_win.his_view.get_buffer().unwrap().set_text("3333333");
                         //win
                     }else {
                         let chat_title = &format!("和{}({})聊天窗口", name, host_ip);
@@ -160,13 +161,14 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         let ip_str_1 = host_ip.clone();
                         let ip_str_2 = host_ip.clone();
                         let ip_str_3 = host_ip.clone();
+                        let clone_hist_view_event = text_view.clone();
                         button2.connect_clicked(move|_|{
                             let start_iter = &text_view_presend.get_buffer().unwrap().get_start_iter();
                             let end_iter = &text_view_presend.get_buffer().unwrap().get_end_iter();
                             let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
                             message::send_ipmsg(context.to_owned(), ip_str_1.clone());
-                            &text_view.get_buffer().unwrap().set_text(context);
-                            &text_view_presend.get_buffer().unwrap().set_text("");
+                            &clone_hist_view_event.get_buffer().unwrap().set_text(context);
+                            &clone_hist_view_event.get_buffer().unwrap().set_text("");
                         });
                         chat_window.show_all();
                         chat_window.connect_delete_event(move|_, _| {
@@ -178,7 +180,8 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                             Inhibit(false)
                         });
                         let clone_chat = chat_window.clone();
-                        map.insert(ip_str_2, clone_chat);
+                        let clone_hist_view = text_view.clone();
+                        map.insert(ip_str_2, ChatWindow{ win: clone_chat, his_view:  clone_hist_view});
                     }
                 }
             }
@@ -247,8 +250,14 @@ fn receive() -> ::glib::Continue {
     ::glib::Continue(false)
 }
 
+#[derive(Clone)]
+pub struct ChatWindow {
+    pub win :Window,
+    pub his_view :TextView,
+}
+
 thread_local!(
     pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//UdpSocket
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);
-    pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, Window>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);
+    pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);
 );
