@@ -125,8 +125,12 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                 if !host_ip.is_empty(){
                     if let Some(chat_win) = select_map.get(&host_ip) {
                         println!("已经存在了");
-                        chat_win.his_view.get_buffer().unwrap().set_text("3333333");
-                        //win
+                        if let Some(pac) = packet {
+                            let additional_section =  pac.additional_section.unwrap();
+                            let v: Vec<&str> = additional_section.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                            let (start, mut end) = chat_win.his_view.get_buffer().unwrap().get_bounds();
+                            chat_win.his_view.get_buffer().unwrap().insert(&mut end, format!("{}:{}\n", pac.sender_name, v[0]).as_str());
+                        }
                     }else {
                         let chat_title = &format!("和{}({})聊天窗口", name, host_ip);
                         let chat_window = Window::new(::gtk::WindowType::Toplevel);
@@ -147,7 +151,11 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         text_view.set_cursor_visible(false);
                         text_view.set_editable(false);
                         scroll.add(&text_view);
-
+                        if let Some(pac) = packet {
+                            let additional_section =  pac.additional_section.unwrap();
+                            let v: Vec<&str> = additional_section.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                            &text_view.get_buffer().unwrap().set_text(format!("{}:{}\n", name, v[0]).as_str());
+                        }
                         let text_view_presend = gtk::TextView::new();
                         let scroll1 = gtk::ScrolledWindow::new(None, None);
                         scroll1.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
@@ -163,12 +171,13 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         let ip_str_3 = host_ip.clone();
                         let clone_hist_view_event = text_view.clone();
                         button2.connect_clicked(move|_|{
-                            let start_iter = &text_view_presend.get_buffer().unwrap().get_start_iter();
-                            let end_iter = &text_view_presend.get_buffer().unwrap().get_end_iter();
+                            let (start_iter, mut end_iter) = text_view_presend.get_buffer().unwrap().get_bounds();
                             let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
+                            println!("{}", context);
                             message::send_ipmsg(context.to_owned(), ip_str_1.clone());
-                            &clone_hist_view_event.get_buffer().unwrap().set_text(context);
-                            &clone_hist_view_event.get_buffer().unwrap().set_text("");
+                            let (his_start_iter, mut his_end_iter) = clone_hist_view_event.get_buffer().unwrap().get_bounds();
+                            &clone_hist_view_event.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
+                            &text_view_presend.get_buffer().unwrap().set_text("");
                         });
                         chat_window.show_all();
                         chat_window.connect_delete_event(move|_, _| {
