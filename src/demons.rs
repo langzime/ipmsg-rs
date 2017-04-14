@@ -76,10 +76,12 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                     let packet: Packet = receiver.recv().unwrap();
                     let opt = constant::get_opt(packet.command_no);
                     let cmd = constant::get_mode(packet.command_no);
-                    //let extstr: String = packet.additional_section.unwrap();
-                    //let ext_vec: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
-                    //println!("我是扩展消息 {:?}", ext_vec);
+                    println!("{:?}", packet);
                     println!("命令位 {:x} 扩展位{:x}", cmd, opt);
+                    if let Some(ref extstr) = packet.additional_section{
+                        let ext_vec: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                        println!("扩展段 {:?}", ext_vec);
+                    }
                     let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
                     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
                         let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
@@ -103,9 +105,6 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                             let packet_clone = packet.clone();
                             remained_sender.send(((packet.sender_name, packet.ip), Some(packet_clone)));
                             ::glib::idle_add(create_or_open_chat);
-                            //let extstr: String = packet.additional_section.unwrap();
-                            //let v: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
-                            //println!("我是明文消息 {:?}", v);println!("我是明文消息 {:?}", v);
                         }
                     }else {
 
@@ -120,7 +119,6 @@ pub fn create_or_open_chat() -> ::glib::Continue {
     GLOBAL_WINDOWS.with(|global| {
         if let Some((ref mut map, ref rx)) = *global.borrow_mut() {
             if let Ok(((name, host_ip), packet)) = rx.try_recv() {
-                println!("{:?}", packet);
                 let select_map = map.clone();
                 if !host_ip.is_empty(){
                     if let Some(chat_win) = select_map.get(&host_ip) {
