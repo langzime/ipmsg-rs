@@ -40,12 +40,17 @@ impl Packet {
     }
 
     /// from attrs 生成packet
-    pub fn from(ver: String, packet_no: String, sender_name: String, sender_host: String, command_no: u32, additional_section: Option<String>) -> Packet {
+    pub fn from<S>(ver: S,
+                packet_no: S,
+                sender_name: S,
+                sender_host: S,
+                command_no: u32,
+                additional_section: Option<String>) -> Packet where S: Into<String> {
         Packet {
-            ver: ver,
-            packet_no: packet_no,
-            sender_name: sender_name,
-            sender_host: sender_host,
+            ver: ver.into(),
+            packet_no: packet_no.into(),
+            sender_name: sender_name.into(),
+            sender_host: sender_host.into(),
             command_no: command_no,
             additional_section: additional_section,
             ip: "".to_owned(),
@@ -55,16 +60,24 @@ impl Packet {
 
 impl ToString for Packet {
     fn to_string(&self) -> String {
-        let ext = &self.additional_section;
-        //ext.as_ref().unwrap_or(&hostname)
         let hostname = ::hostname::get_hostname().unwrap();
-        format!("{}:{}:{}:{}:{}:{}",
-                self.ver,
-                self.packet_no,
-                self.sender_name,
-                self.sender_host,
-                self.command_no,
-                ext.as_ref().unwrap_or(&"".to_owned()))
+        if let Some(ref ext_str) = self.additional_section {
+            format!("{}:{}:{}:{}:{}:{}",
+                    self.ver,
+                    self.packet_no,
+                    self.sender_name,
+                    self.sender_host,
+                    self.command_no,
+                    ext_str)
+        }else {
+            format!("{}:{}:{}:{}:{}:{}",
+                    self.ver,
+                    self.packet_no,
+                    self.sender_name,
+                    self.sender_host,
+                    self.command_no,
+                    "")
+        }
     }
 }
 
@@ -77,12 +90,12 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(name :String, host :String, ip :String, group :String) -> User {
+    pub fn new<S: Into<String>>(name :S, host :S, ip :S, group :S) -> User {
         User{
-            name: name,
-            host: host,
-            ip: ip,
-            group: group,
+            name: name.into(),
+            host: host.into(),
+            ip: ip.into(),
+            group: group.into(),
         }
     }
 }

@@ -28,7 +28,7 @@ pub fn send_ipmsg(context :String, tar_ip: String){
             thread::spawn(move||{
                 let packet = Packet::new(constant::IPMSG_SENDMSG, Some(context));
                 let addr:String = format!("{}:{}", tar_ip, constant::IPMSG_DEFAULT_PORT);
-                socket_clone.send_to(::util::utf8_to_gb18030(packet.to_string()).as_slice(), addr.as_str()).expect("couldn't send message");
+                socket_clone.send_to(::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str()).expect("couldn't send message");
             });
         }
     });
