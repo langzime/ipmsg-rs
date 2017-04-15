@@ -132,6 +132,7 @@ pub fn get_home_name() -> Option<String> {
 lazy_static! {
     pub static ref homename: String = get_home_name().unwrap();
     pub static ref localip: String = get_local_ip().unwrap().to_string();
+    pub static ref addr: String = format!("{}{}", "0.0.0.0:", IPMSG_DEFAULT_PORT);
 }
 
 

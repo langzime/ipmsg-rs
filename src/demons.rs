@@ -3,8 +3,12 @@ use std::str;
 use std::thread;
 use model::Packet;
 use std::net::UdpSocket;
+use std::net::{TcpStream, TcpListener};
 use std::sync::mpsc;
 use std::collections::HashMap;
+use std::time;
+use std::io::Read;
+use std::io::Write;
 
 use constant;
 use model;
@@ -74,14 +78,11 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
             thread::spawn(move || {
                 loop {
                     let packet: Packet = receiver.recv().unwrap();
+                    let extstr = packet.clone().additional_section.unwrap_or("".to_owned());
                     let opt = constant::get_opt(packet.command_no);
                     let cmd = constant::get_mode(packet.command_no);
                     println!("{:?}", packet);
-                    println!("命令位 {:x} 扩展位{:x}", cmd, opt);
-                    if let Some(ref extstr) = packet.additional_section{
-                        let ext_vec: Vec<&str> = extstr.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
-                        println!("扩展段 {:?}", ext_vec);
-                    }
+                    println!("命令位 {:x} 扩展位 {:x} 扩展段 {}", cmd, opt, extstr);
                     let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
                     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
                         let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
@@ -92,24 +93,83 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         sender.send(OperUser::new(user, Operate::REMOVE));
                         ::glib::idle_add(receive);
                     } else if cmd == constant::IPMSG_BR_ENTRY {//收到上线通知消息
+                        ///扩展段 用户名|用户组
+                        let ext_vec = extstr.splitn(2, |c| c == ':').collect::<Vec<&str>>();
                         let ansentry_packet = Packet::new(constant::IPMSG_ANSENTRY, None);
                         socket_clone.set_broadcast(false).unwrap();
                         socket_clone.send_to(ansentry_packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
-                        let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
+                        let group_name = if ext_vec.len() > 2 {
+                            ext_vec[1].to_owned()
+                        }else {
+                            "".to_owned()
+                        };
+                        let user_name = if ext_vec.len() > 1&& !ext_vec[0].is_empty() {
+                            ext_vec[0].to_owned()
+                        }else {
+                            packet.sender_name
+                        };
+                        let user = User::new(user_name, packet.sender_host, packet.ip, group_name);
                         sender.send(OperUser::new(user, Operate::ADD));
                         ::glib::idle_add(receive);
                     }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
+                        //文字消息|文件扩展段
+                        let ext_vec = extstr.splitn(2, |c| c == '\0').collect::<Vec<&str>>();
                         if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
                             println!("我是密封消息");
-                        } else {
-                            let packet_clone = packet.clone();
-                            remained_sender.send(((packet.sender_name, packet.ip), Some(packet_clone)));
-                            ::glib::idle_add(create_or_open_chat);
                         }
+                        let msg_str = if ext_vec.len() > 0 { ext_vec[0] } else { "" };
+                        //文字消息内容|文件扩展
+                        if opt&constant::IPMSG_FILEATTACHOPT != 0 {
+                            if ext_vec.len() > 1 {
+                                let files_str: &str = ext_vec[1];
+                                println!("我是带文件附件的 {}", files_str);
+                                //915551600:setup.exe:24000:55d0ae3e:1:\u{7}915551601:ipmsg.chm:b04e:55d0ae3e:1:\u{7}
+                                let files = files_str.split('\u{7}').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                                for file_str in files {
+                                    println!("{}", file_str);
+                                    let file_attr = file_str.splitn(5, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                                    if file_attr.len() >= 5 {
+                                        //fileID:filename:size:mtime:fileattr[:extend-attr=val1[,val2...][:extend-attr2=...]]:\a[:]fileID...
+                                        let file_id = file_attr[0];
+                                        let file_name = file_attr[1];
+                                        let size = file_attr[2];//大小
+                                        let mmtime = file_attr[3];//修改时间
+                                        let file_attr = file_attr[4];
+                                        println!("{} {}", file_name, i32::from_str_radix(mmtime, 16).unwrap());
+                                        let ntime = NaiveDateTime::from_timestamp(i32::from_str_radix(mmtime, 16).unwrap() as i64, 0);
+                                        println!("{}", ntime.format("%Y-%m-%d %H:%M:%S").to_string());
+                                    }
+                                }
+                            };
+                        }
+                        let packet_clone = packet.clone();
+                        remained_sender.send(((packet.sender_name, packet.ip), Some(packet_clone)));
+                        ::glib::idle_add(create_or_open_chat);
                     }else {
 
                     }
                 }
+            });
+        }
+    });
+}
+
+pub fn start_file_processer() {
+    thread::spawn(move||{
+        let tcp_listener: TcpListener = TcpListener::bind(constant::addr.as_str()).unwrap();
+        for stream in tcp_listener.incoming() {
+            let base_stream = stream.unwrap().try_clone().unwrap();
+            thread::spawn(move||{
+                println!("come in !!");
+                let mut stream = base_stream;
+                println!("from {:?}",stream.peer_addr());
+                let mut bytes: Vec<u8> = Vec::new();;
+                stream.read(&mut bytes);
+                loop {
+                    stream.write(String::from("1").as_bytes());
+                    thread::sleep(time::Duration::from_secs(2));
+                }
+                println!("come end !!");
             });
         }
     });
@@ -125,7 +185,8 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         println!("已经存在了");
                         if let Some(pac) = packet {
                             let additional_section =  pac.additional_section.unwrap();
-                            let v: Vec<&str> = additional_section.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                            //let v = additional_section.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                            let v = additional_section.split('\0').into_iter().collect::<Vec<&str>>();
                             let (start, mut end) = chat_win.his_view.get_buffer().unwrap().get_bounds();
                             chat_win.his_view.get_buffer().unwrap().insert(&mut end, format!("{}:{}\n", pac.sender_name, v[0]).as_str());
                         }
@@ -151,7 +212,8 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         scroll.add(&text_view);
                         if let Some(pac) = packet {
                             let additional_section =  pac.additional_section.unwrap();
-                            let v: Vec<&str> = additional_section.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                            //let v: Vec<&str> = additional_section.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
+                            let v: Vec<&str> = additional_section.split('\0').into_iter().collect();
                             &text_view.get_buffer().unwrap().set_text(format!("{}:{}\n", name, v[0]).as_str());
                         }
                         let text_view_presend = gtk::TextView::new();
@@ -266,5 +328,6 @@ pub struct ChatWindow {
 thread_local!(
     pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//UdpSocket
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);
+    pub static GLOBAL_TCPLISTENER: RefCell<Option<TcpListener>> = RefCell::new(None);
     pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);
 );

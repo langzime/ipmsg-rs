@@ -26,7 +26,7 @@ use gtk::{
 };
 
 use chrono::prelude::*;
-
+use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::cell::RefCell;
 use std::thread;
@@ -104,9 +104,9 @@ fn main() {
         *global.borrow_mut() = Some((model, user_list_receiver))
     });
 
-    let addr: String = format!("{}{}", "0.0.0.0:", constant::IPMSG_DEFAULT_PORT);
+    //let addr: String = format!("{}{}", "0.0.0.0:", constant::IPMSG_DEFAULT_PORT);
 
-    let socket: UdpSocket = match UdpSocket::bind(addr.as_str()) {
+    let socket: UdpSocket = match UdpSocket::bind(constant::addr.as_str()) {
         Ok(s) => {
             println!("{:?} 开启端口监听", s);
             s
@@ -128,6 +128,7 @@ fn main() {
     let packet_sender_clone = packet_sender.clone();
     //接收消息守护线程
     demons::start_daemon(packet_sender_clone);
+    //demons::start_file_processer();
     //消息处理守护线程
     demons::start_message_processer(packet_receiver, new_user_sender_clone, remained_sender.clone());
     //启动发送上线消息
