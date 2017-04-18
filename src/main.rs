@@ -57,14 +57,39 @@ fn main() {
 
     let menu_bar = MenuBar::new();
     let sytem_item = MenuItem::new_with_label("系统");
+    let menu_sys = Menu::new();
+    let about = MenuItem::new_with_label("关于");
+    let quit = MenuItem::new_with_label("退出");
+    menu_sys.append(&about);
+    menu_sys.append(&quit);
+    sytem_item.set_submenu(Some(&menu_sys));
     menu_bar.append(&sytem_item);
+
     let window_item = MenuItem::new_with_label("窗口");
+    let menu_window = Menu::new();
+    let send_file = MenuItem::new_with_label("发送文件");
+    menu_window.append(&send_file);
+    window_item.set_submenu(Some(&menu_window));
     menu_bar.append(&window_item);
-    let config_item = MenuItem::new_with_label("配置");
-    menu_bar.append(&config_item);
+
+    let window_about = window.clone();
+    about.connect_activate(move |_| {
+        let p = AboutDialog::new();
+        p.set_website_label(Some("ipmsg"));
+        p.set_website(Some("https://www.langzi.me"));
+        p.set_authors(&["langzi"]);
+        p.set_title("关于");
+        p.set_transient_for(Some(&window_about));
+        p.run();
+        p.destroy();
+    });
+
+    let window_quit = window.clone();
+    quit.connect_activate(move |_| {
+        gtk::main_quit();
+    });
 
     let label = Label::new("");
-
     let scrolled = ScrolledWindow::new(None, None);
     scrolled.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     let tree = create_and_setup_view();
@@ -128,7 +153,7 @@ fn main() {
     let packet_sender_clone = packet_sender.clone();
     //接收消息守护线程
     demons::start_daemon(packet_sender_clone);
-    //demons::start_file_processer();
+    demons::start_file_processer();
     //消息处理守护线程
     demons::start_message_processer(packet_receiver, new_user_sender_clone, remained_sender.clone());
     //启动发送上线消息

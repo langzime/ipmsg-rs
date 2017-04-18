@@ -119,3 +119,50 @@ impl OperUser {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct ShareInfo {
+    //包编号
+    pub packet_no: u32,
+    // 要发送的目的机器列表
+    pub host: String,
+    // 要发送的目的机器个数
+    pub host_cnt: u32,
+    //transStat
+    // 要传输的文件信息
+    pub file_info: FileInfo,
+    // 要传输的文件个数
+    pub file_cnt: u32,
+    //文件添加时间
+    pub attach_time: NaiveTime,
+}
+
+#[derive(Clone, Debug)]
+pub struct FileInfo {
+    //要传输文件id
+    pub file_id: u32,
+    //文件名
+    pub file_name: String,
+    //文件的属性，如是文件或者文件夹，只读等
+    pub attr: u8,
+    //文件大小
+    pub size: u64,
+    //文件最后一次修改时间
+    pub mtime: NaiveTime,
+    //文件最后一次访问时间
+    pub atime: NaiveTime,
+    //文件创建时间
+    pub crtime: NaiveTime,
+    pub is_selected: bool,
+}
+
+/*impl FileInfo {
+    pub fn new<S>(file_id: S, file_name: S, size: S, mmtime: S) -> FileInfo where S: Into<String> {
+        FileInfo {
+            file_id: file_id.into(),
+            file_name: file_name.into(),
+            size: size.into(),
+            mmtime: mmtime.into(),
+        }
+    }
+}*/

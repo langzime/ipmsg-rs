@@ -6,17 +6,19 @@ use std::net::UdpSocket;
 use std::net::{TcpStream, TcpListener};
 use std::sync::mpsc;
 use std::collections::HashMap;
-use std::time;
+use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use std::io::Read;
 use std::io::Write;
+use std::fs::{self, File, Metadata};
+use std::io::BufReader;
 
 use constant;
-use model;
-use model::{User, OperUser, Operate};
+use model::{self, User, OperUser, Operate};
 use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 use gtk;
 use gtk::TreeModelExt;
 use gtk::prelude::*;
@@ -113,7 +115,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         ::glib::idle_add(receive);
                     }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
                         //文字消息|文件扩展段
-                        let ext_vec = extstr.splitn(2, |c| c == '\0').collect::<Vec<&str>>();
+                        let ext_vec = extstr.split('\0').collect::<Vec<&str>>();
                         if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
                             println!("我是密封消息");
                         }
@@ -126,7 +128,6 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                                 //915551600:setup.exe:24000:55d0ae3e:1:\u{7}915551601:ipmsg.chm:b04e:55d0ae3e:1:\u{7}
                                 let files = files_str.split('\u{7}').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                 for file_str in files {
-                                    println!("{}", file_str);
                                     let file_attr = file_str.splitn(5, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                     if file_attr.len() >= 5 {
                                         //fileID:filename:size:mtime:fileattr[:extend-attr=val1[,val2...][:extend-attr2=...]]:\a[:]fileID...
@@ -134,9 +135,9 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                                         let file_name = file_attr[1];
                                         let size = file_attr[2];//大小
                                         let mmtime = file_attr[3];//修改时间
+                                        let mmtime_num = i64::from_str_radix(mmtime, 16).unwrap();//时间戳
                                         let file_attr = file_attr[4];
-                                        println!("{} {}", file_name, i32::from_str_radix(mmtime, 16).unwrap());
-                                        let ntime = NaiveDateTime::from_timestamp(i32::from_str_radix(mmtime, 16).unwrap() as i64, 0);
+                                        let ntime = NaiveDateTime::from_timestamp(mmtime_num as i64, 0);
                                         println!("{}", ntime.format("%Y-%m-%d %H:%M:%S").to_string());
                                     }
                                 }
@@ -157,7 +158,8 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
 pub fn start_file_processer() {
     thread::spawn(move||{
         let tcp_listener: TcpListener = TcpListener::bind(constant::addr.as_str()).unwrap();
-        for stream in tcp_listener.incoming() {
+        println!("start listening!");
+        for stream in tcp_listener.incoming(){
             let base_stream = stream.unwrap().try_clone().unwrap();
             thread::spawn(move||{
                 println!("come in !!");
@@ -165,11 +167,11 @@ pub fn start_file_processer() {
                 println!("from {:?}",stream.peer_addr());
                 let mut bytes: Vec<u8> = Vec::new();;
                 stream.read(&mut bytes);
+                println!("come end !!{:?}", bytes.len());
                 loop {
                     stream.write(String::from("1").as_bytes());
                     thread::sleep(time::Duration::from_secs(2));
                 }
-                println!("come end !!");
             });
         }
     });
@@ -201,8 +203,10 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         let h_button_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
                         let button1 = gtk::Button::new_with_label("清空");
                         let button2 = gtk::Button::new_with_label("发送");
+                        let button3 = gtk::Button::new_with_label("选择文件");
                         h_button_box.add(&button1);
                         h_button_box.add(&button2);
+                        h_button_box.add(&button3);
                         let text_view = gtk::TextView::new();
                         let scroll = gtk::ScrolledWindow::new(None, None);
                         scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
@@ -234,10 +238,42 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                             let (start_iter, mut end_iter) = text_view_presend.get_buffer().unwrap().get_bounds();
                             let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
                             println!("{}", context);
-                            message::send_ipmsg(context.to_owned(), ip_str_1.clone());
+                            message::send_ipmsg(context.to_owned(), Vec::new(), ip_str_1.clone());
                             let (his_start_iter, mut his_end_iter) = clone_hist_view_event.get_buffer().unwrap().get_bounds();
                             &clone_hist_view_event.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
                             &text_view_presend.get_buffer().unwrap().set_text("");
+                        });
+                        let chat_window1 = chat_window.clone();
+                        button3.connect_clicked(move|_|{
+                            let file_chooser = gtk::FileChooserDialog::new(
+                                Some("打开文件"), Some(&chat_window1), gtk::FileChooserAction::Open);
+                            file_chooser.add_buttons(&[
+                                ("打开", gtk::ResponseType::Ok.into()),
+                                ("取消", gtk::ResponseType::Cancel.into()),
+                            ]);
+                            if file_chooser.run() == gtk::ResponseType::Ok.into() {
+                                let filename = file_chooser.get_filename().unwrap();
+                                let metadata: Metadata = fs::metadata(filename).unwrap();
+                                if metadata.is_file() {
+
+                                }else if metadata.is_dir() {
+
+                                };
+                                let modify_time: time::SystemTime = metadata.modified().unwrap();
+                                let chrono_time = ::util::system_time_to_date_time(modify_time);
+                                let local_time = chrono_time.with_timezone(&::chrono::Local);
+                                /*let file_info = model::FileInfo {
+                                    file_id: Local::now().timestamp() as i32,
+                                    file_name: filename,
+                                    attr: 1,
+                                    size: ,
+                                    mtime: (),
+                                    atime: (),
+                                    crtime: (),
+                                    is_selected: (),
+                                };*/
+                            }
+                            file_chooser.destroy();
                         });
                         chat_window.show_all();
                         chat_window.connect_delete_event(move|_, _| {
@@ -328,6 +364,6 @@ pub struct ChatWindow {
 thread_local!(
     pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//UdpSocket
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);
-    pub static GLOBAL_TCPLISTENER: RefCell<Option<TcpListener>> = RefCell::new(None);
     pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);
+    //pub static GLOBAL_Test: RefCell<Option<Arc<Mutex<Vec<OperUser>>>>> = RefCell::new(None);
 );
