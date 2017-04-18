@@ -68,7 +68,9 @@ fn main() {
     let window_item = MenuItem::new_with_label("窗口");
     let menu_window = Menu::new();
     let send_file = MenuItem::new_with_label("发送文件");
+    let manage_file = MenuItem::new_with_label("管理文件");
     menu_window.append(&send_file);
+    menu_window.append(&manage_file);
     window_item.set_submenu(Some(&menu_window));
     menu_bar.append(&window_item);
 
