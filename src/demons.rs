@@ -125,10 +125,9 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                             if ext_vec.len() > 1 {
                                 let files_str: &str = ext_vec[1];
                                 println!("我是带文件附件的 {}", files_str);
-                                //915551600:setup.exe:24000:55d0ae3e:1:\u{7}915551601:ipmsg.chm:b04e:55d0ae3e:1:\u{7}
                                 let files = files_str.split(constant::FILELIST_SEPARATOR).into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                 for file_str in files {
-                                    let file_attr = file_str.splitn(5, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                                    let file_attr = file_str.splitn(6, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                     if file_attr.len() >= 5 {
                                         //fileID:filename:size:mtime:fileattr[:extend-attr=val1[,val2...][:extend-attr2=...]]:\a[:]fileID...
                                         let file_id = file_attr[0];
@@ -136,9 +135,14 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                                         let size = file_attr[2];//大小
                                         let mmtime = file_attr[3];//修改时间
                                         let mmtime_num = i64::from_str_radix(mmtime, 16).unwrap();//时间戳
-                                        let file_attr = file_attr[4];
+                                        let file_attr = file_attr[4].parse::<u32>().unwrap();//文件属性
                                         let ntime = NaiveDateTime::from_timestamp(mmtime_num as i64, 0);
                                         println!("{}", ntime.format("%Y-%m-%d %H:%M:%S").to_string());
+                                        if file_attr == constant::IPMSG_FILE_REGULAR {
+                                            println!("普通文件");
+                                        }else if file_attr == constant::IPMSG_FILE_DIR {
+                                            println!("文件夹");
+                                        }
                                     }
                                 }
                             };
