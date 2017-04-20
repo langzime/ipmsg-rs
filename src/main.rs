@@ -2,8 +2,6 @@
 extern crate gtk;
 extern crate glib;
 extern crate chrono;
-extern crate hostname;
-extern crate local_ip;
 extern crate encoding;
 #[macro_use]
 extern crate lazy_static;

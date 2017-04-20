@@ -11,7 +11,7 @@ pub fn send_ipmsg_br_entry(){
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
             thread::spawn(move||{
-                let packet = Packet::new(IPMSG_BR_ENTRY|IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *constant::homename, *constant::homename)));
+                let packet = Packet::new(IPMSG_BR_ENTRY|IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *constant::hostname, *constant::hostname)));
                 socket_clone.set_broadcast(true).unwrap();
                 let addr:String = format!("{}:{}", constant::IPMSG_LIMITED_BROADCAST, constant::IPMSG_DEFAULT_PORT);
                 socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");

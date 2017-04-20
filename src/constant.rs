@@ -62,6 +62,27 @@ pub const IPMSG_GETPUBKEY: u32 = 0x00000072;
 ///应答RSA公钥
 pub const IPMSG_ANSPUBKEY: u32 = 0x00000073;
 
+/* file types for fileattach command */
+pub const IPMSG_FILE_REGULAR: u32 = 0x00000001;
+pub const IPMSG_FILE_DIR: u32 = 0x00000002;
+pub const IPMSG_FILE_RETPARENT: u32 = 0x00000003;// return parent directory
+pub const IPMSG_FILE_SYMLINK: u32 = 0x00000004;
+pub const IPMSG_FILE_CDEV: u32 = 0x00000005;// for UNIX
+pub const IPMSG_FILE_BDEV: u32 = 0x00000006;// for UNIX
+pub const IPMSG_FILE_FIFO: u32 = 0x00000007;// for UNIX
+pub const IPMSG_FILE_RESFORK: u32 = 0x00000010;// for mac
+
+/* file attribute options for fileattach command */
+pub const IPMSG_FILE_RONLYOPT: u32 = 0x00000100;
+pub const IPMSG_FILE_HIDDENOPT: u32 = 0x00001000;
+pub const IPMSG_FILE_EXHIDDENOPT: u32 = 0x00002000;// for MacOS X
+pub const IPMSG_FILE_ARCHIVEOPT: u32 = 0x00004000;
+pub const IPMSG_FILE_SYSTEMOPT: u32 = 0x00008000;
+
+/* extend attribute types for fileattach command */
+pub const FILELIST_SEPARATOR: char = '\u{7}';
+pub const HOSTLIST_SEPARATOR: char = '\u{7}';
+
 /* option or all command */
 ///存在/缺席模式（成员识别命令中使用）
 pub const IPMSG_ABSENCEOPT: u32 = 0x00000100;
@@ -117,20 +138,23 @@ pub fn get_opt(command: u32) -> u32 {
     command & 0xffffff00
 }
 
+extern crate hostname as host_name;
+extern crate local_ip;
+
 use std::net::IpAddr;
 
 ///得到本地ip
 pub fn get_local_ip() -> Option<IpAddr> {
-    ::local_ip::get()
+    local_ip::get()
 }
 
 ///得到主机名
-pub fn get_home_name() -> Option<String> {
-    ::hostname::get_hostname()
+pub fn get_host_name() -> Option<String> {
+    host_name::get_hostname()
 }
 
 lazy_static! {
-    pub static ref homename: String = get_home_name().unwrap();
+    pub static ref hostname: String = get_host_name().unwrap();
     pub static ref localip: String = get_local_ip().unwrap().to_string();
     pub static ref addr: String = format!("{}{}", "0.0.0.0:", IPMSG_DEFAULT_PORT);
 }

@@ -1,6 +1,6 @@
 use std::net::TcpStream;
 use chrono::prelude::*;
-use constant;
+use constant::{self, IPMSG_VERSION};
 
 ///
 /// 数据包格式
@@ -22,17 +22,61 @@ pub struct Packet {
     pub ip: String,
 }
 
+type ExtStr = String;
+
+trait ExtMsg {
+    fn to_ext_msg() -> ExtStr;
+}
+
+#[derive(Default)]
+pub struct PacketBuilder {
+    ///版本好 标准协议为1
+    pub ver: String,
+    ///数据包编号
+    pub packet_no: String,
+    ///发送者的昵称
+    pub sender_name: String,
+    ///发送者的主机名
+    pub sender_host: String,
+    ///命令字
+    pub command_no: u32,
+    ///扩展命令
+    pub ext_commands: Vec<u32>,
+}
+
+impl PacketBuilder {
+    ///命令
+    fn command(command_no: u32) -> PacketBuilder {
+        let local: DateTime<Local> = Local::now();
+        let mut packet_builder: PacketBuilder = Default::default();
+        packet_builder.ver = format!("{}", IPMSG_VERSION);
+        packet_builder.packet_no = format!("{}", local.timestamp());
+        packet_builder.sender_name = constant::hostname.clone();
+        packet_builder.sender_host = constant::hostname.clone();
+        packet_builder.command_no = command_no;
+        packet_builder
+    }
+    ///扩展命令
+    fn command_opt(mut self, ext_command_no: u32) -> PacketBuilder {
+        self.ext_commands.push(ext_command_no);
+        self
+    }
+
+    /*fn finish(&self) -> Packet {
+
+    }*/
+}
+
 impl Packet {
 
     ///new packet
     pub fn new(command_no: u32, additional_section: Option<String>) -> Packet {
         let local: DateTime<Local> = Local::now();
-        let hostname = ::hostname::get_hostname().unwrap();
         Packet {
-            ver: format!("{}", constant::IPMSG_VERSION),
+            ver: format!("{}", IPMSG_VERSION),
             packet_no: format!("{}", local.timestamp()),
-            sender_name: hostname.clone(),
-            sender_host: hostname.clone(),
+            sender_name: constant::hostname.clone(),
+            sender_host: constant::hostname.clone(),
             command_no: command_no,
             additional_section: additional_section,
             ip: "".to_owned(),
@@ -60,7 +104,6 @@ impl Packet {
 
 impl ToString for Packet {
     fn to_string(&self) -> String {
-        let hostname = ::hostname::get_hostname().unwrap();
         if let Some(ref ext_str) = self.additional_section {
             format!("{}:{}:{}:{}:{}:{}",
                     self.ver,
@@ -156,13 +199,3 @@ pub struct FileInfo {
     pub is_selected: bool,
 }
 
-/*impl FileInfo {
-    pub fn new<S>(file_id: S, file_name: S, size: S, mmtime: S) -> FileInfo where S: Into<String> {
-        FileInfo {
-            file_id: file_id.into(),
-            file_name: file_name.into(),
-            size: size.into(),
-            mmtime: mmtime.into(),
-        }
-    }
-}*/
