@@ -172,11 +172,8 @@ pub fn start_file_processer() {
                     let search_arc = search_arc_tmp.clone();
                     thread::spawn(move || {
                         let mut stream_echo = base_stream;
-                        //println!("from {:?}",stream_echo.peer_addr());
                         let mut buf = [0; 2048];
                         stream_echo.read(&mut buf[..]).unwrap();
-                        //stream_echo.write("fdjfd".as_bytes());
-                        //1:1492660195:IPMSG:192.168.0.94:96:58f82fcd:ecbc60e:0:\u{0}ANDROID
                         let tmp_str = GB18030.decode(&buf, DecoderTrap::Strict).unwrap();
                         let receive_str = tmp_str.trim_right_matches('\u{0}');
                         println!("file_processer receive raw str {:?}", receive_str);
@@ -193,18 +190,31 @@ pub fn start_file_processer() {
                                 let cmd = constant::get_mode(packet.command_no);
                                 if cmd & constant::IPMSG_GETFILEDATA != 0 {
                                     //文件请求
-                                    println!("文件请求");
                                     let file_attr = v[5].splitn(4, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                                    println!("文件报文解析 {:?}", file_attr);
                                     if file_attr.len() >= 3 {
-                                        let packet_id = file_attr[0];
-                                        let file_id = file_attr[1];
+                                        let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
+                                        let file_id = i64::from_str_radix(file_attr[1], 16).unwrap();
                                         let offset = file_attr[2].parse::<u32>().unwrap();
+                                        let mut search_result: Option<ShareInfo> = Option::None;
+                                        {
+                                            let search = search_arc.lock().unwrap();
+                                            let ref vec: Vec<ShareInfo> = *search;
+                                            let result = vec.iter().find(|ref s| s.packet_no == packet_id);
+                                            search_result = result.cloned();
+                                        }
+                                        if let Some(result_share_file) = search_result {
+                                            let mut f: File = File::open(result_share_file.file_info.file_name).unwrap();
+                                            let mut buffer = [0; 1024];
+                                            while let Ok(bytes_read) = f.read(&mut buffer) {
+                                                if bytes_read == 0 { break; }
+                                                stream_echo.write(&buffer[..bytes_read]);
+                                            }
+                                        }
                                     }
-                                    search_arc;
-                                    println!("文件报文解析 {:?}", file_attr)
                                 } else if cmd & constant::IPMSG_GETDIRFILES != 0 {
                                     //文件夹请求
-                                    println!("文件夹请求");
+                                    println!("文件夹报文解析");
                                 }
                             }
                         } else {
