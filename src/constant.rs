@@ -1,10 +1,10 @@
-/// 头
+/*  header  */
 ///飞鸽版本
 pub const IPMSG_VERSION: u32 = 0x0001;
 ///默认端口号
 pub const IPMSG_DEFAULT_PORT: u32 = 0x0979;
 
-///命令
+/*  command  */
 /// 无操作
 pub const IPMSG_NOOPERATION: u32 = 0x00000000;
 ///上线（开始于广播此命令

@@ -1,6 +1,7 @@
 use std::net::TcpStream;
 use chrono::prelude::*;
 use constant::{self, IPMSG_VERSION};
+use std::path::{PathBuf, Path};
 
 ///
 /// 数据包格式
@@ -185,7 +186,7 @@ pub struct FileInfo {
     //要传输文件id
     pub file_id: u32,
     //文件名
-    pub file_name: String,
+    pub file_name: PathBuf,
     //文件的属性，如是文件或者文件夹，只读等
     pub attr: u8,
     //文件大小
@@ -197,5 +198,12 @@ pub struct FileInfo {
     //文件创建时间
     pub crtime: NaiveTime,
     pub is_selected: bool,
+}
+
+impl FileInfo {
+    pub fn to_packet_msg(&self) -> String {
+        let file_name = self.file_name.as_path().file_name().unwrap().to_str().unwrap();
+        format!("{}:{}:{:x}:{:x}:{}:", self.file_id, file_name, self.size, self.mtime.second(), self.attr)
+    }
 }
 

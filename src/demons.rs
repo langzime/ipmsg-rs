@@ -11,9 +11,10 @@ use std::io::Read;
 use std::io::Write;
 use std::fs::{self, File, Metadata};
 use std::io::BufReader;
+use std::path::PathBuf;
 
 use constant;
-use model::{self, User, OperUser, Operate};
+use model::{self, User, OperUser, Operate, ShareInfo};
 use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
@@ -248,7 +249,6 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         scroll.add(&text_view);
                         if let Some(pac) = packet {
                             let additional_section =  pac.additional_section.unwrap();
-                            //let v: Vec<&str> = additional_section.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect();
                             let v: Vec<&str> = additional_section.split('\0').into_iter().collect();
                             &text_view.get_buffer().unwrap().set_text(format!("{}:{}\n", name, v[0]).as_str());
                         }
@@ -266,16 +266,20 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         let ip_str_2 = host_ip.clone();
                         let ip_str_3 = host_ip.clone();
                         let clone_hist_view_event = text_view.clone();
+                        let pre_send_files: Arc<RefCell<Vec<model::FileInfo>>> = Arc::new(RefCell::new(Vec::new()));//待发送文件列表
+                        let files_send_clone = pre_send_files.clone();
                         button2.connect_clicked(move|_|{
                             let (start_iter, mut end_iter) = text_view_presend.get_buffer().unwrap().get_bounds();
                             let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
                             println!("{}", context);
-                            message::send_ipmsg(context.to_owned(), Vec::new(), ip_str_1.clone());
+                            message::send_ipmsg(context.to_owned(), files_send_clone.borrow().to_vec(), ip_str_1.clone());
+                            (*files_send_clone.borrow_mut()).clear();
                             let (his_start_iter, mut his_end_iter) = clone_hist_view_event.get_buffer().unwrap().get_bounds();
                             &clone_hist_view_event.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
                             &text_view_presend.get_buffer().unwrap().set_text("");
                         });
                         let chat_window1 = chat_window.clone();
+                        let files_add_clone = pre_send_files.clone();
                         button3.connect_clicked(move|_|{
                             let file_chooser = gtk::FileChooserDialog::new(
                                 Some("打开文件"), Some(&chat_window1), gtk::FileChooserAction::Open);
@@ -284,26 +288,31 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                                 ("取消", gtk::ResponseType::Cancel.into()),
                             ]);
                             if file_chooser.run() == gtk::ResponseType::Ok.into() {
-                                let filename = file_chooser.get_filename().unwrap();
-                                let metadata: Metadata = fs::metadata(filename).unwrap();
-                                if metadata.is_file() {
-
+                                let filename: PathBuf = file_chooser.get_filename().unwrap();
+                                let metadata: Metadata = fs::metadata(&filename).unwrap();
+                                let size = metadata.len();
+                                let attr = if metadata.is_file() {
+                                    constant::IPMSG_FILE_REGULAR
                                 }else if metadata.is_dir() {
-
+                                    constant::IPMSG_FILE_DIR
+                                }else {
+                                    panic!("oh no!");
                                 };
                                 let modify_time: time::SystemTime = metadata.modified().unwrap();
                                 let chrono_time = ::util::system_time_to_date_time(modify_time);
                                 let local_time = chrono_time.with_timezone(&::chrono::Local);
-                                /*let file_info = model::FileInfo {
-                                    file_id: Local::now().timestamp() as i32,
-                                    file_name: filename,
-                                    attr: 1,
-                                    size: ,
-                                    mtime: (),
-                                    atime: (),
-                                    crtime: (),
-                                    is_selected: (),
-                                };*/
+                                let file_info = model::FileInfo {
+                                    file_id: Local::now().timestamp() as u32,
+                                    file_name: filename.clone(),
+                                    attr: attr as u8,
+                                    size: size,
+                                    mtime: Local::now().time(),
+                                    atime: Local::now().time(),
+                                    crtime: Local::now().time(),
+                                    is_selected: false,
+                                };
+                                let ref mut files_add = *files_add_clone.borrow_mut();
+                                files_add.push(file_info);//添加待发送文件
                             }
                             file_chooser.destroy();
                         });
@@ -397,5 +406,5 @@ thread_local!(
     pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//UdpSocket
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);
     pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);
-    //pub static GLOBAL_Test: RefCell<Option<Arc<Mutex<Vec<OperUser>>>>> = RefCell::new(None);
+    pub static GLOBAL_SHARELIST: RefCell<Option<Arc<Mutex<Vec<ShareInfo>>>>> = RefCell::new(Some(Arc::new(Mutex::new(Vec::new()))));
 );
