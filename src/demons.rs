@@ -161,49 +161,56 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
 }
 
 pub fn start_file_processer() {
-    thread::spawn(move || {
-        let tcp_listener: TcpListener = TcpListener::bind(constant::addr.as_str()).unwrap();
-        println!("start listening!");
-        for stream in tcp_listener.incoming() {
-            let base_stream = stream.unwrap().try_clone().unwrap();
+    GLOBAL_SHARELIST.with(|global_shares| {
+        if let Some(ref share_infos_arc) = *global_shares.borrow() {
+            let search_arc_tmp = share_infos_arc.clone();
             thread::spawn(move || {
-                let mut stream_echo = base_stream;
-                //println!("from {:?}",stream_echo.peer_addr());
-                let mut buf = [0; 2048];
-                stream_echo.read(&mut buf[..]).unwrap();
-                //stream_echo.write("fdjfd".as_bytes());
-                //1:1492660195:IPMSG:192.168.0.94:96:58f82fcd:ecbc60e:0:\u{0}ANDROID
-                let tmp_str = GB18030.decode(&buf, DecoderTrap::Strict).unwrap();
-                let receive_str = tmp_str.trim_right_matches('\u{0}');
-                println!("file_processer receive raw str {:?}", receive_str);
-                let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
-                if v.len() > 4 {
-                    let mut packet = Packet::from(String::from(v[0]),
-                                                  String::from(v[1]),
-                                                  String::from(v[2]),
-                                                  String::from(v[3]),
-                                                  v[4].parse::<u32>().unwrap(),
-                                                  None
-                    );
-                    if v.len() > 5 {
-                        let cmd = constant::get_mode(packet.command_no);
-                        if cmd & constant::IPMSG_GETFILEDATA != 0 {
-                            //文件请求
-                            println!("文件请求");
-                            let file_attr = v[5].splitn(4, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
-                            if file_attr.len() >= 3 {
-                                let packet_id = file_attr[0];
-                                let file_id = file_attr[1];
-                                let offset = file_attr[2].parse::<u32>().unwrap();
+                let tcp_listener: TcpListener = TcpListener::bind(constant::addr.as_str()).unwrap();
+                println!("start listening!");
+                for stream in tcp_listener.incoming() {
+                    let base_stream = stream.unwrap().try_clone().unwrap();
+                    let search_arc = search_arc_tmp.clone();
+                    thread::spawn(move || {
+                        let mut stream_echo = base_stream;
+                        //println!("from {:?}",stream_echo.peer_addr());
+                        let mut buf = [0; 2048];
+                        stream_echo.read(&mut buf[..]).unwrap();
+                        //stream_echo.write("fdjfd".as_bytes());
+                        //1:1492660195:IPMSG:192.168.0.94:96:58f82fcd:ecbc60e:0:\u{0}ANDROID
+                        let tmp_str = GB18030.decode(&buf, DecoderTrap::Strict).unwrap();
+                        let receive_str = tmp_str.trim_right_matches('\u{0}');
+                        println!("file_processer receive raw str {:?}", receive_str);
+                        let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
+                        if v.len() > 4 {
+                            let mut packet = Packet::from(String::from(v[0]),
+                                                          String::from(v[1]),
+                                                          String::from(v[2]),
+                                                          String::from(v[3]),
+                                                          v[4].parse::<u32>().unwrap(),
+                                                          None
+                            );
+                            if v.len() > 5 {
+                                let cmd = constant::get_mode(packet.command_no);
+                                if cmd & constant::IPMSG_GETFILEDATA != 0 {
+                                    //文件请求
+                                    println!("文件请求");
+                                    let file_attr = v[5].splitn(4, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                                    if file_attr.len() >= 3 {
+                                        let packet_id = file_attr[0];
+                                        let file_id = file_attr[1];
+                                        let offset = file_attr[2].parse::<u32>().unwrap();
+                                    }
+                                    search_arc;
+                                    println!("文件报文解析 {:?}", file_attr)
+                                } else if cmd & constant::IPMSG_GETDIRFILES != 0 {
+                                    //文件夹请求
+                                    println!("文件夹请求");
+                                }
                             }
-                            println!("文件报文解析 {:?}", file_attr)
-                        } else if cmd & constant::IPMSG_GETDIRFILES != 0 {
-                            //文件夹请求
-                            println!("文件夹请求");
+                        } else {
+                            println!("Invalid packet {} !", receive_str);
                         }
-                    }
-                } else {
-                    println!("Invalid packet {} !", receive_str);
+                    });
                 }
             });
         }
