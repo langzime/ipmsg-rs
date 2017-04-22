@@ -114,6 +114,10 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         let user = User::new(user_name, packet.sender_host, packet.ip, group_name);
                         sender.send(OperUser::new(user, Operate::ADD));
                         ::glib::idle_add(receive);
+                    }else if cmd == constant::IPMSG_ANSENTRY {//通报新上线
+                        let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
+                        sender.send(OperUser::new(user, Operate::ADD));
+                        ::glib::idle_add(receive);
                     }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
                         //文字消息|文件扩展段
                         let ext_vec = extstr.split('\0').collect::<Vec<&str>>();
@@ -125,7 +129,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         if opt&constant::IPMSG_FILEATTACHOPT != 0 {
                             if ext_vec.len() > 1 {
                                 let files_str: &str = ext_vec[1];
-                                println!("我是带文件附件的 {}", files_str);
+                                println!("我是带文件附件的 {:?}", files_str);
                                 let files = files_str.split(constant::FILELIST_SEPARATOR).into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                 for file_str in files {
                                     let file_attr = file_str.splitn(6, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
