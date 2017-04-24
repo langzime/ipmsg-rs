@@ -20,11 +20,9 @@ use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
-use gtk;
-use gtk::TreeModelExt;
 use gtk::prelude::*;
 use gtk::{
-    CellRendererText, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
+    self, TreeModelExt, CellRendererText, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
     WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
     ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment,
 };
@@ -44,7 +42,7 @@ pub fn start_daemon(sender: mpsc::Sender<Packet>){
                             //let receive_str = unsafe { str::from_utf8_unchecked(&buf[0..amt])};
                             //todo 默认是用中文编码 还没想到怎么做兼容
                             let receive_str = GB18030.decode(&buf[0..amt], DecoderTrap::Strict).unwrap();
-                            println!("收到原始信息 -> {} 来自 ip -> {}", receive_str, src.ip());
+                            info!("receive raw message -> {:?} from ip -> {:?}", receive_str, src.ip());
                             let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
                             if v.len() > 4 {
                                 let mut packet = Packet::from(String::from(v[0]),
@@ -64,7 +62,7 @@ pub fn start_daemon(sender: mpsc::Sender<Packet>){
                             }
                         },
                         Err(e) => {
-                            println!("couldn't recieve a datagram: {}", e);
+                            info!("couldn't recieve a datagram: {}", e);
                         }
                     }
                 }
@@ -84,8 +82,8 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                     let extstr = packet.clone().additional_section.unwrap_or("".to_owned());
                     let opt = constant::get_opt(packet.command_no);
                     let cmd = constant::get_mode(packet.command_no);
-                    println!("{:?}", packet);
-                    println!("命令位 {:x} 扩展位 {:x} 扩展段 {}", cmd, opt, extstr);
+                    info!("{:?}", packet);
+                    info!("cmd {:x} opt {:x} opt section {:?}", cmd, opt, extstr);
                     let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
                     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
                         let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
@@ -122,14 +120,14 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         //文字消息|文件扩展段
                         let ext_vec = extstr.split('\0').collect::<Vec<&str>>();
                         if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
-                            println!("我是密封消息");
+                            info!("我是密封消息");
                         }
                         let msg_str = if ext_vec.len() > 0 { ext_vec[0] } else { "" };
                         //文字消息内容|文件扩展
                         if opt&constant::IPMSG_FILEATTACHOPT != 0 {
                             if ext_vec.len() > 1 {
                                 let files_str: &str = ext_vec[1];
-                                println!("我是带文件附件的 {:?}", files_str);
+                                info!("我是带文件附件的 {:?}", files_str);
                                 let files = files_str.split(constant::FILELIST_SEPARATOR).into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                 for file_str in files {
                                     let file_attr = file_str.splitn(6, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
@@ -142,11 +140,11 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                                         let mmtime_num = i64::from_str_radix(mmtime, 16).unwrap();//时间戳
                                         let file_attr = file_attr[4].parse::<u32>().unwrap();//文件属性
                                         let ntime = NaiveDateTime::from_timestamp(mmtime_num as i64, 0);
-                                        println!("{}", ntime.format("%Y-%m-%d %H:%M:%S").to_string());
+                                        info!("{}", ntime.format("%Y-%m-%d %H:%M:%S").to_string());
                                         if file_attr == constant::IPMSG_FILE_REGULAR {
-                                            println!("普通文件");
+                                            info!("普通文件");
                                         }else if file_attr == constant::IPMSG_FILE_DIR {
-                                            println!("文件夹");
+                                            info!("文件夹");
                                         }
                                     }
                                 }
@@ -170,7 +168,7 @@ pub fn start_file_processer() {
             let search_arc_tmp = share_infos_arc.clone();
             thread::spawn(move || {
                 let tcp_listener: TcpListener = TcpListener::bind(constant::addr.as_str()).unwrap();
-                println!("start listening!");
+                info!("tcp server start listening! {:?}", constant::addr.as_str());
                 for stream in tcp_listener.incoming() {
                     let base_stream = stream.unwrap().try_clone().unwrap();
                     let search_arc = search_arc_tmp.clone();
@@ -180,7 +178,7 @@ pub fn start_file_processer() {
                         stream_echo.read(&mut buf[..]).unwrap();
                         let tmp_str = GB18030.decode(&buf, DecoderTrap::Strict).unwrap();
                         let receive_str = tmp_str.trim_right_matches('\u{0}');
-                        println!("file_processer receive raw str {:?}", receive_str);
+                        info!("file_processer receive raw str {:?}", receive_str);
                         let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
                         if v.len() > 4 {
                             let mut packet = Packet::from(String::from(v[0]),
@@ -195,7 +193,7 @@ pub fn start_file_processer() {
                                 if cmd & constant::IPMSG_GETFILEDATA != 0 {
                                     //文件请求
                                     let file_attr = v[5].splitn(4, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
-                                    println!("文件报文解析 {:?}", file_attr);
+                                    info!("文件报文解析 {:?}", file_attr);
                                     if file_attr.len() >= 3 {
                                         let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
                                         let file_id = i64::from_str_radix(file_attr[1], 16).unwrap();
@@ -218,11 +216,16 @@ pub fn start_file_processer() {
                                     }
                                 } else if cmd & constant::IPMSG_GETDIRFILES != 0 {
                                     //文件夹请求
-                                    println!("文件夹报文解析");
+                                    let file_attr = v[5].splitn(2, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                                    info!("文件夹报文解析");
+                                    if file_attr.len() >= 2 {
+                                        let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
+                                        let file_id = i64::from_str_radix(file_attr[1], 16).unwrap();
+                                    }
                                 }
                             }
                         } else {
-                            println!("Invalid packet {} !", receive_str);
+                            info!("Invalid packet {} !", receive_str);
                         }
                     });
                 }
@@ -238,10 +241,9 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                 let select_map = map.clone();
                 if !host_ip.is_empty(){
                     if let Some(chat_win) = select_map.get(&host_ip) {
-                        println!("已经存在了");
+                        info!("已经存在了");
                         if let Some(pac) = packet {
                             let additional_section =  pac.additional_section.unwrap();
-                            //let v = additional_section.split('\0').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                             let v = additional_section.split('\0').into_iter().collect::<Vec<&str>>();
                             let (start, mut end) = chat_win.his_view.get_buffer().unwrap().get_bounds();
                             chat_win.his_view.get_buffer().unwrap().insert(&mut end, format!("{}:{}\n", pac.sender_name, v[0]).as_str());
@@ -258,9 +260,11 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                         let button1 = gtk::Button::new_with_label("清空");
                         let button2 = gtk::Button::new_with_label("发送");
                         let button3 = gtk::Button::new_with_label("选择文件");
+                        let button4 = gtk::Button::new_with_label("选择文件夹");
                         h_button_box.add(&button1);
                         h_button_box.add(&button2);
                         h_button_box.add(&button3);
+                        h_button_box.add(&button4);
                         let text_view = gtk::TextView::new();
                         let scroll = gtk::ScrolledWindow::new(None, None);
                         scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
@@ -305,7 +309,7 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                             let file_chooser = gtk::FileChooserDialog::new(
                                 Some("打开文件"), Some(&chat_window1), gtk::FileChooserAction::Open);
                             file_chooser.add_buttons(&[
-                                ("打开", gtk::ResponseType::Ok.into()),
+                                ("选择文件", gtk::ResponseType::Ok.into()),
                                 ("取消", gtk::ResponseType::Cancel.into()),
                             ]);
                             if file_chooser.run() == gtk::ResponseType::Ok.into() {
@@ -333,6 +337,44 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                                     is_selected: false,
                                 };
                                 let ref mut files_add = *files_add_clone.borrow_mut();
+                                files_add.push(file_info);//添加待发送文件
+                            }
+                            file_chooser.destroy();
+                        });
+                        let chat_window2 = chat_window.clone();
+                        let files_add_folder_clone = pre_send_files.clone();
+                        button4.connect_clicked(move|_|{
+                            let file_chooser = gtk::FileChooserDialog::new(
+                                Some("打开文件夹"), Some(&chat_window2), gtk::FileChooserAction::SelectFolder);
+                            file_chooser.add_buttons(&[
+                                ("选择文件夹", gtk::ResponseType::Ok.into()),
+                                ("取消", gtk::ResponseType::Cancel.into()),
+                            ]);
+                            if file_chooser.run() == gtk::ResponseType::Ok.into() {
+                                let filename: PathBuf = file_chooser.get_filename().unwrap();
+                                let metadata: Metadata = fs::metadata(&filename).unwrap();
+                                let size = metadata.len();
+                                let attr = if metadata.is_file() {
+                                    constant::IPMSG_FILE_REGULAR
+                                }else if metadata.is_dir() {
+                                    constant::IPMSG_FILE_DIR
+                                }else {
+                                    panic!("oh no!");
+                                };
+                                let modify_time: time::SystemTime = metadata.modified().unwrap();
+                                let chrono_time = ::util::system_time_to_date_time(modify_time);
+                                let local_time = chrono_time.with_timezone(&::chrono::Local);
+                                let file_info = model::FileInfo {
+                                    file_id: Local::now().timestamp() as u32,
+                                    file_name: filename.clone(),
+                                    attr: attr as u8,
+                                    size: size,
+                                    mtime: Local::now().time(),
+                                    atime: Local::now().time(),
+                                    crtime: Local::now().time(),
+                                    is_selected: false,
+                                };
+                                let ref mut files_add = *files_add_folder_clone.borrow_mut();
                                 files_add.push(file_info);//添加待发送文件
                             }
                             file_chooser.destroy();

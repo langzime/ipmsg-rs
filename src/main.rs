@@ -5,6 +5,9 @@ extern crate chrono;
 extern crate encoding;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 
 mod constant;
@@ -35,8 +38,10 @@ use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSoc
 use model::Packet;
 
 fn main() {
+    env_logger::init().unwrap();
+    info!("starting up");
     if gtk::init().is_err() {
-        println!("Failed to initialize GTK.");
+        info!("Failed to initialize GTK.");
         return;
     }
 
@@ -133,7 +138,7 @@ fn main() {
 
     let socket: UdpSocket = match UdpSocket::bind(constant::addr.as_str()) {
         Ok(s) => {
-            println!("{:?} 开启端口监听", s);
+            info!("udp server start listening! {:?}", constant::addr.as_str());
             s
         },
         Err(e) => panic!("couldn't bind socket: {}", e)

@@ -188,7 +188,7 @@ pub struct FileInfo {
     //文件名
     pub file_name: PathBuf,
     //文件的属性，如是文件或者文件夹，只读等
-    pub attr: u8,
+    pub attr: u8,// 1 普通文件 2 文件夹
     //文件大小
     pub size: u64,
     //文件最后一次修改时间
