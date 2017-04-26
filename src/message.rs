@@ -58,6 +58,7 @@ pub fn send_ipmsg(context :String, files: Vec<model::FileInfo>, tar_ip: String){
             context1.push_str(additional.as_str());
             context1.push('\u{0}');
             let packet = Packet::new(commond, Some(context1));
+            info!("send message {:?}", packet);
             thread::spawn(move||{
                 let addr:String = format!("{}:{}", tar_ip, IPMSG_DEFAULT_PORT);
                 socket_clone.send_to(::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str()).expect("couldn't send message");

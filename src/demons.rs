@@ -9,9 +9,9 @@ use std::collections::HashMap;
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use std::io::Read;
 use std::io::Write;
-use std::fs::{self, File, Metadata};
-use std::io::BufReader;
-use std::path::PathBuf;
+use std::fs::{self, File, Metadata, ReadDir};
+use std::io::{BufReader, BufWriter};
+use std::path::{PathBuf, Path};
 
 use constant;
 use model::{self, User, OperUser, Operate, ShareInfo};
@@ -27,6 +27,7 @@ use gtk::{
     ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment,
 };
 use message;
+use util;
 
 
 ///启动消息监听线程
@@ -83,6 +84,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                     let opt = constant::get_opt(packet.command_no);
                     let cmd = constant::get_mode(packet.command_no);
                     info!("{:?}", packet);
+                    info!("{:x}", packet.packet_no.parse::<i32>().unwrap());
                     info!("cmd {:x} opt {:x} opt section {:?}", cmd, opt, extstr);
                     let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
                     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
@@ -120,14 +122,14 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         //文字消息|文件扩展段
                         let ext_vec = extstr.split('\0').collect::<Vec<&str>>();
                         if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
-                            info!("我是密封消息");
+                            info!("i am secret message !");
                         }
                         let msg_str = if ext_vec.len() > 0 { ext_vec[0] } else { "" };
                         //文字消息内容|文件扩展
                         if opt&constant::IPMSG_FILEATTACHOPT != 0 {
                             if ext_vec.len() > 1 {
                                 let files_str: &str = ext_vec[1];
-                                info!("我是带文件附件的 {:?}", files_str);
+                                info!("i have file attachment {:?}", files_str);
                                 let files = files_str.split(constant::FILELIST_SEPARATOR).into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                 for file_str in files {
                                     let file_attr = file_str.splitn(6, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
@@ -142,9 +144,9 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                                         let ntime = NaiveDateTime::from_timestamp(mmtime_num as i64, 0);
                                         info!("{}", ntime.format("%Y-%m-%d %H:%M:%S").to_string());
                                         if file_attr == constant::IPMSG_FILE_REGULAR {
-                                            info!("普通文件");
+                                            info!("i am ipmsg_file_regular");
                                         }else if file_attr == constant::IPMSG_FILE_DIR {
-                                            info!("文件夹");
+                                            info!("i am ipmsg_file_dir");
                                         }
                                     }
                                 }
@@ -190,10 +192,10 @@ pub fn start_file_processer() {
                             );
                             if v.len() > 5 {
                                 let cmd = constant::get_mode(packet.command_no);
-                                if cmd & constant::IPMSG_GETFILEDATA != 0 {
+                                if cmd == constant::IPMSG_GETFILEDATA {
                                     //文件请求
                                     let file_attr = v[5].splitn(4, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
-                                    info!("文件报文解析 {:?}", file_attr);
+                                    info!("file packet parse {:?}", file_attr);
                                     if file_attr.len() >= 3 {
                                         let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
                                         let file_id = i64::from_str_radix(file_attr[1], 16).unwrap();
@@ -207,31 +209,106 @@ pub fn start_file_processer() {
                                         }
                                         if let Some(result_share_file) = search_result {
                                             let mut f: File = File::open(result_share_file.file_info.file_name).unwrap();
-                                            let mut buffer = [0; 1024];
-                                            while let Ok(bytes_read) = f.read(&mut buffer) {
+                                            let mut buf = [0; 1024];
+                                            let mut buffer = BufWriter::new(stream_echo);
+                                            while let Ok(bytes_read) = f.read(&mut buf) {
                                                 if bytes_read == 0 { break; }
-                                                stream_echo.write(&buffer[..bytes_read]);
+                                                buffer.write(&buf[..bytes_read]).unwrap();
                                             }
+                                            buffer.flush().unwrap();
                                         }
+
                                     }
-                                } else if cmd & constant::IPMSG_GETDIRFILES != 0 {
-                                    //文件夹请求
-                                    let file_attr = v[5].splitn(2, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
-                                    info!("文件夹报文解析");
+                                } else if cmd == constant::IPMSG_GETDIRFILES {
+                                    //文件夹请求 todo 发送文件夹还有问题
+                                    let file_attr = v[5].splitn(3, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                                    info!("file dir packet parse {:?}", file_attr);
                                     if file_attr.len() >= 2 {
                                         let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
                                         let file_id = i64::from_str_radix(file_attr[1], 16).unwrap();
+                                        let mut search_result: Option<ShareInfo> = Option::None;
+                                        {
+                                            let search = search_arc.lock().unwrap();
+                                            let ref vec: Vec<ShareInfo> = *search;
+                                            let result = vec.iter().find(|ref s| s.packet_no == packet_id);
+                                            search_result = result.cloned();
+                                        }
+                                        if let Some(result_share_file) = search_result {
+                                            info!("找到了 {:?}", &result_share_file);
+                                            let root_path: PathBuf = result_share_file.file_info.file_name;
+                                            {
+                                                let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
+                                                buffer.write(util::utf8_to_gb18030(&make_header(&root_path)).as_slice()).unwrap();
+                                                buffer.flush().unwrap();
+                                            }
+
+                                            {
+                                                //002F:FeiGe1:01000:2:14=15ba9da9818:16=47d21313:
+                                                //002E:test1:01000:2:14=15ba9d98e78:16=47d21313:0041:Android版飞鸽传书简介.txt:04c5:1:14=15ba9d98e78:16=47d21313:
+                                                //000D:.:0:3:0:002D:test:01000:2:14=15ba99810d8:16=47d21313:0041:Android版飞鸽传书简介.txt:04c5:1:14=15ba97375c0:16=47d21313:
+                                                //000D:.:0:3:0:0041:Android版飞鸽传书简介.txt:04c5:1:14=15ba9d9f020:16=47d21313:
+                                                //000D:.:0:3:0:
+                                                let sub_file_path: ReadDir = fs::read_dir(root_path).unwrap();
+                                                //println!("{:?}", sub_file_path);
+                                                for pathq in sub_file_path {
+                                                    //println!("Name: {:?}", &pathq.unwrap().path());
+                                                    let sub = &pathq.unwrap().path();
+                                                    let header = make_header(sub);
+                                                    let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
+                                                    buffer.write(header.as_bytes()).unwrap();
+                                                    if sub.is_file() {
+                                                        let mut buf = [0; 1024 * 4];
+                                                        let mut f: File = File::open(sub).unwrap();
+                                                        while let Ok(bytes_read) = f.read(&mut buf) {
+                                                            if bytes_read == 0 { break; }
+                                                            buffer.write(&buf[..bytes_read]);
+                                                        }
+                                                    }
+                                                    buffer.flush().unwrap();
+                                                }
+                                            }
+
+                                            {
+                                                let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
+                                                buffer.write("000D:.:0:3:0:".as_bytes()).unwrap();
+                                                buffer.flush().unwrap();
+                                            }
+
+                                        }
                                     }
                                 }
                             }
                         } else {
-                            info!("Invalid packet {} !", receive_str);
+                            info!("Invalid packet {:?} !", receive_str);
                         }
                     });
                 }
             });
         }
     });
+}
+
+pub fn make_header(path: &PathBuf) -> String {
+    let path_metadata: Metadata = fs::metadata(&path).unwrap();
+    let file_attr = if path_metadata.is_dir() {
+        constant::IPMSG_FILE_DIR
+    } else {
+        constant::IPMSG_FILE_REGULAR
+    };
+    let file_name: &str = &path.file_name().unwrap().to_str().unwrap();
+    let mut header = String::new();
+    header.push_str(":");
+    header.push_str(file_name);//filename
+    header.push_str(":");
+    header.push_str(format!("{:x}", path_metadata.len()).as_str());//filesize
+    header.push_str(":");
+    header.push_str(format!("{:x}", file_attr).as_str());//fileattr
+    let timestamp_now = Local::now().timestamp();
+    header.push_str(format!(":{:x}={:x}:{:x}={:x}:", constant::IPMSG_FILE_CREATETIME, timestamp_now, constant::IPMSG_FILE_MTIME, timestamp_now).as_str());//
+    let mut length = util::utf8_to_gb18030(&header).len();
+    length = length + format!("{:0>4x}", length).len();
+    header.insert_str(0, format!("{:0>4x}", length).as_str());
+    header
 }
 
 pub fn create_or_open_chat() -> ::glib::Continue {

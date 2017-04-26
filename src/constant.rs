@@ -80,6 +80,9 @@ pub const IPMSG_FILE_ARCHIVEOPT: u32 = 0x00004000;
 pub const IPMSG_FILE_SYSTEMOPT: u32 = 0x00008000;
 
 /* extend attribute types for fileattach command */
+pub const IPMSG_FILE_CREATETIME: u32 = 0x00000016;
+pub const IPMSG_FILE_MTIME: u32 = 0x00000014;
+
 pub const FILELIST_SEPARATOR: char = '\u{7}';
 pub const HOSTLIST_SEPARATOR: char = '\u{7}';
 
