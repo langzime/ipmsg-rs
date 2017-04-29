@@ -258,14 +258,6 @@ pub fn start_file_processer() {
     });
 }
 
-/*INFO:raudient::demons: "002b:11111111:ee:2:16=59036c99:14=59036c99:"
-INFO:raudient::demons: "0033:common_types.js:867:1:16=59036c99:14=59036c99:"
-INFO:raudient::demons: "0038:imagecloud_types.js:33a5:1:16=59036c99:14=59036c99:"
-INFO:raudient::demons: "003a:ImagecloudService.js:15228:1:16=59036c99:14=59036c99:"
-INFO:raudient::demons: "0034:point_types.js:18809:1:16=59036c99:14=59036c99:"
-INFO:raudient::demons: "0035:PointService.js:59e41:1:16=59036c99:14=59036c99:"
-INFO:raudient::demons: "000D:.:0:3:0:"*/
-
 //send dir
 pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
     buffer.write(util::utf8_to_gb18030(&make_header(&root_path)).as_slice());//主目录
