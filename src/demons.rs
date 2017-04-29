@@ -29,6 +29,12 @@ use gtk::{
 use message;
 use util;
 
+//文件类型
+enum FileType {
+    FILE,
+    DIR,
+    RET
+}
 
 ///启动消息监听线程
 pub fn start_daemon(sender: mpsc::Sender<Packet>){
@@ -220,7 +226,7 @@ pub fn start_file_processer() {
 
                                     }
                                 } else if cmd == constant::IPMSG_GETDIRFILES {
-                                    //文件夹请求 todo 发送文件夹还有问题
+                                    //dir todo send dir has problem
                                     let file_attr = v[5].splitn(3, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                     info!("file dir packet parse {:?}", file_attr);
                                     if file_attr.len() >= 2 {
@@ -234,46 +240,10 @@ pub fn start_file_processer() {
                                             search_result = result.cloned();
                                         }
                                         if let Some(result_share_file) = search_result {
-                                            info!("找到了 {:?}", &result_share_file);
+                                            info!("find {:?}", &result_share_file);
                                             let root_path: PathBuf = result_share_file.file_info.file_name;
-                                            {
-                                                let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
-                                                buffer.write(util::utf8_to_gb18030(&make_header(&root_path)).as_slice()).unwrap();
-                                                buffer.flush().unwrap();
-                                            }
-
-                                            {
-                                                //002F:FeiGe1:01000:2:14=15ba9da9818:16=47d21313:
-                                                //002E:test1:01000:2:14=15ba9d98e78:16=47d21313:0041:Android版飞鸽传书简介.txt:04c5:1:14=15ba9d98e78:16=47d21313:
-                                                //000D:.:0:3:0:002D:test:01000:2:14=15ba99810d8:16=47d21313:0041:Android版飞鸽传书简介.txt:04c5:1:14=15ba97375c0:16=47d21313:
-                                                //000D:.:0:3:0:0041:Android版飞鸽传书简介.txt:04c5:1:14=15ba9d9f020:16=47d21313:
-                                                //000D:.:0:3:0:
-                                                let sub_file_path: ReadDir = fs::read_dir(root_path).unwrap();
-                                                //println!("{:?}", sub_file_path);
-                                                for pathq in sub_file_path {
-                                                    //println!("Name: {:?}", &pathq.unwrap().path());
-                                                    let sub = &pathq.unwrap().path();
-                                                    let header = make_header(sub);
-                                                    let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
-                                                    buffer.write(header.as_bytes()).unwrap();
-                                                    if sub.is_file() {
-                                                        let mut buf = [0; 1024 * 4];
-                                                        let mut f: File = File::open(sub).unwrap();
-                                                        while let Ok(bytes_read) = f.read(&mut buf) {
-                                                            if bytes_read == 0 { break; }
-                                                            buffer.write(&buf[..bytes_read]);
-                                                        }
-                                                    }
-                                                    buffer.flush().unwrap();
-                                                }
-                                            }
-
-                                            {
-                                                let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
-                                                buffer.write("000D:.:0:3:0:".as_bytes()).unwrap();
-                                                buffer.flush().unwrap();
-                                            }
-
+                                            let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
+                                            send_dir(&root_path, &mut buffer);
                                         }
                                     }
                                 }
@@ -286,6 +256,44 @@ pub fn start_file_processer() {
             });
         }
     });
+}
+
+/*INFO:raudient::demons: "002b:11111111:ee:2:16=59036c99:14=59036c99:"
+INFO:raudient::demons: "0033:common_types.js:867:1:16=59036c99:14=59036c99:"
+INFO:raudient::demons: "0038:imagecloud_types.js:33a5:1:16=59036c99:14=59036c99:"
+INFO:raudient::demons: "003a:ImagecloudService.js:15228:1:16=59036c99:14=59036c99:"
+INFO:raudient::demons: "0034:point_types.js:18809:1:16=59036c99:14=59036c99:"
+INFO:raudient::demons: "0035:PointService.js:59e41:1:16=59036c99:14=59036c99:"
+INFO:raudient::demons: "000D:.:0:3:0:"*/
+
+//send dir
+pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
+    buffer.write(util::utf8_to_gb18030(&make_header(&root_path)).as_slice());//主目录
+    info!("{:?}", &make_header(&root_path));
+    buffer.flush().unwrap();
+    if root_path.is_dir() {
+        for sub_path in fs::read_dir(root_path).unwrap() {
+            let sub = &sub_path.unwrap().path();
+            if sub.is_file() {
+                let header = make_header(sub);
+                buffer.write(header.as_bytes());
+                info!("{:?}", header);
+                let mut buf = [0; 1024 * 4];
+                let mut f: File = File::open(sub).unwrap();
+                while let Ok(bytes_read) = f.read(&mut buf) {
+                    if bytes_read == 0 { break; }
+                    buffer.write(&buf[..bytes_read]);
+                }
+            }else {
+                send_dir(sub, &mut buffer);
+            }
+            buffer.flush().unwrap();
+        }
+    }
+
+    buffer.write("000D:.:0:3:0:".as_bytes());
+    info!("{:?}", "000D:.:0:3:0:");
+    buffer.flush().unwrap();
 }
 
 pub fn make_header(path: &PathBuf) -> String {
