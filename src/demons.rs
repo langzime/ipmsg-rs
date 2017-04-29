@@ -260,15 +260,14 @@ pub fn start_file_processer() {
 
 //send dir
 pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
-    buffer.write(util::utf8_to_gb18030(&make_header(&root_path)).as_slice());//主目录
+    buffer.write(util::utf8_to_gb18030(&make_header(&root_path)).as_slice());//root dir
     info!("{:?}", &make_header(&root_path));
-    buffer.flush().unwrap();
     if root_path.is_dir() {
         for sub_path in fs::read_dir(root_path).unwrap() {
             let sub = &sub_path.unwrap().path();
             if sub.is_file() {
                 let header = make_header(sub);
-                buffer.write(header.as_bytes());
+                buffer.write(util::utf8_to_gb18030(&header).as_slice());
                 info!("{:?}", header);
                 let mut buf = [0; 1024 * 4];
                 let mut f: File = File::open(sub).unwrap();
@@ -279,13 +278,11 @@ pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
             }else {
                 send_dir(sub, &mut buffer);
             }
-            buffer.flush().unwrap();
         }
     }
 
     buffer.write("000D:.:0:3:0:".as_bytes());
     info!("{:?}", "000D:.:0:3:0:");
-    buffer.flush().unwrap();
 }
 
 pub fn make_header(path: &PathBuf) -> String {
