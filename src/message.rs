@@ -5,10 +5,11 @@ use encoding::all::GB18030;
 use chrono::prelude::*;
 use model::{self, Packet};
 use constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT};
+use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_WINDOWS, GLOBAL};
 
 ///启动发送上线消息
 pub fn send_ipmsg_br_entry(){
-    ::demons::GLOBAL_UDPSOCKET.with(|global| {
+    GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
             thread::spawn(move||{
@@ -23,7 +24,7 @@ pub fn send_ipmsg_br_entry(){
 
 ///发送消息
 pub fn send_ipmsg(context :String, files: Vec<model::FileInfo>, tar_ip: String){
-    ::demons::GLOBAL_UDPSOCKET.with(|global| {
+    GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
             let commond = if files.len() > 0 { IPMSG_SENDMSG|IPMSG_FILEATTACHOPT } else { IPMSG_SENDMSG };//如果有文件，需要扩展文件
@@ -44,7 +45,7 @@ pub fn send_ipmsg(context :String, files: Vec<model::FileInfo>, tar_ip: String){
                 additional.push_str(file.to_packet_msg().as_str());
                 additional.push('\u{7}');
             }
-            ::demons::GLOBAL_SHARELIST.with(|global_shares| {
+            GLOBAL_SHARELIST.with(|global_shares| {
                 if let Some(ref share_infos_arc) = *global_shares.borrow() {
                     let mut share_infos = share_infos_arc.lock().unwrap();
                     for share in shares {

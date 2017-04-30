@@ -12,7 +12,7 @@ use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use model::{self, Packet};
 use message;
-use demons::GLOBAL_WINDOWS;
+use app::GLOBAL_WINDOWS;
 
 #[derive(Clone)]
 pub struct ChatWindow {

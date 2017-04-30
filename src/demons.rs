@@ -29,6 +29,7 @@ use gtk::{
 use message;
 use util;
 use chat_window::{self, ChatWindow};
+use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_WINDOWS, GLOBAL};
 
 //文件类型
 enum FileType {
@@ -394,11 +395,3 @@ fn receive() -> ::glib::Continue {
     });
     ::glib::Continue(false)
 }
-
-thread_local!(
-    pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
-    pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);//udp全局变量
-    pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);//聊天窗口列表
-    pub static GLOBAL_SHARELIST: RefCell<Option<Arc<Mutex<Vec<ShareInfo>>>>> = RefCell::new(Some(Arc::new(Mutex::new(Vec::new()))));//发送文件列表
-    pub static GLOBAL_RECEIVELIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<ShareInfo>)>> = RefCell::new(None);//接收文件列表
-);

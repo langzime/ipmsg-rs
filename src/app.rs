@@ -14,7 +14,16 @@ use std::sync::mpsc;
 use std::collections::HashMap;
 use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
-use model::Packet;
+use model::{self, User, OperUser, Operate, ShareInfo, Packet};
+use chat_window::ChatWindow;
+
+thread_local!(
+    pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
+    pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);//udp全局变量
+    pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);//聊天窗口列表
+    pub static GLOBAL_SHARELIST: RefCell<Option<Arc<Mutex<Vec<ShareInfo>>>>> = RefCell::new(Some(Arc::new(Mutex::new(Vec::new()))));//发送文件列表
+    pub static GLOBAL_RECEIVELIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<ShareInfo>)>> = RefCell::new(None);//接收文件列表
+);
 
 pub fn run(){
     ::env_logger::init().unwrap();
@@ -109,7 +118,7 @@ pub fn run(){
     let (user_add_sender, user_list_receiver) = mpsc::channel();
     let new_user_sender_clone = user_add_sender.clone();
     // put ListStore and receiver in thread local storage
-    ::demons::GLOBAL.with(move |global| {
+    GLOBAL.with(move |global| {
         *global.borrow_mut() = Some((model, user_list_receiver))
     });
 
@@ -123,14 +132,14 @@ pub fn run(){
         Err(e) => panic!("couldn't bind socket: {}", e)
     };
 
-    ::demons::GLOBAL_UDPSOCKET.with(move |global| {
+    GLOBAL_UDPSOCKET.with(move |global| {
         *global.borrow_mut() = Some(socket.try_clone().unwrap());
     });
 
     ///待处理消息队列
     let (packet_sender, packet_receiver): (mpsc::Sender<Packet>, mpsc::Receiver<Packet>) = mpsc::channel();
 
-    ::demons::GLOBAL_WINDOWS.with(move |global| {
+    GLOBAL_WINDOWS.with(move |global| {
         *global.borrow_mut() = Some((HashMap::new(), remained_receiver));
     });
 
