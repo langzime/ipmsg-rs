@@ -15,8 +15,8 @@ mod model;
 mod demons;
 mod message;
 mod util;
-mod ui_util;
 mod app;
+mod chat_window;
 
 
 fn main() {
