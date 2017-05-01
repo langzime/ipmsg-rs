@@ -21,6 +21,7 @@ pub struct ChatWindow {
     pub his_view :TextView,
     pub ip :String,
     pub pre_send_files :Arc<RefCell<Vec<model::FileInfo>>>,
+    pub pre_receive_file :Option<ListStore>,
 }
 
 pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>) -> ChatWindow {
@@ -181,7 +182,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     chat_window.show_all();
     let clone_chat = chat_window.clone();
     let clone_hist_view = text_view_history.clone();
-    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files}
+    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files, pre_receive_file: Some(pre_send_files_model_clone)}
 }
 
 fn append_column(tree: &TreeView, id: i32, title: &str) {

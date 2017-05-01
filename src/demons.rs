@@ -327,6 +327,9 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                             let v = additional_section.split('\0').into_iter().collect::<Vec<&str>>();
                             let (start, mut end) = chat_win.his_view.get_buffer().unwrap().get_bounds();
                             chat_win.his_view.get_buffer().unwrap().insert(&mut end, format!("{}:{}\n", pac.sender_name, v[0]).as_str());
+                            //if let Some(ref pre_receive_file_store) = chat_win.pre_receive_file {
+                                //pre_receive_file_store.insert_with_values(None, &[0, 1], &[&&income_user.name, &&income_user.group]);
+                            //}
                         }
                     }else {
                         let ip_str1 = host_ip.clone();
