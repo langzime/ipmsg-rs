@@ -216,14 +216,17 @@ pub fn start_file_processer() {
                                             search_result = result.cloned();
                                         }
                                         if let Some(result_share_file) = search_result {
-                                            let mut f: File = File::open(result_share_file.file_info.file_name).unwrap();
-                                            let mut buf = [0; 1024];
-                                            let mut buffer = BufWriter::new(stream_echo);
-                                            while let Ok(bytes_read) = f.read(&mut buf) {
-                                                if bytes_read == 0 { break; }
-                                                buffer.write(&buf[..bytes_read]).unwrap();
+                                            let file_info = result_share_file.file_info.iter().find(|ref f| f.file_id == file_id as u32);
+                                            if let Some(file_info) = file_info {
+                                                let mut f: File = File::open(&file_info.file_name).unwrap();
+                                                let mut buf = [0; 1024];
+                                                let mut buffer = BufWriter::new(stream_echo);
+                                                while let Ok(bytes_read) = f.read(&mut buf) {
+                                                    if bytes_read == 0 { break; }
+                                                    buffer.write(&buf[..bytes_read]).unwrap();
+                                                }
+                                                buffer.flush().unwrap();
                                             }
-                                            buffer.flush().unwrap();
                                         }
 
                                     }
@@ -242,10 +245,12 @@ pub fn start_file_processer() {
                                             search_result = result.cloned();
                                         }
                                         if let Some(result_share_file) = search_result {
-                                            info!("find {:?}", &result_share_file);
-                                            let root_path: PathBuf = result_share_file.file_info.file_name;
-                                            let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
-                                            send_dir(&root_path, &mut buffer);
+                                            let file_info = result_share_file.file_info.iter().find(|ref f| f.file_id == file_id as u32);
+                                            if let Some(file_info) = file_info {
+                                                let ref root_path: PathBuf = file_info.file_name;
+                                                let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
+                                                send_dir(root_path, &mut buffer);
+                                            }
                                         }
                                     }
                                 }

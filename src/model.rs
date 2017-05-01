@@ -174,7 +174,7 @@ pub struct ShareInfo {
     pub host_cnt: u32,
     //transStat
     // 要传输的文件信息
-    pub file_info: FileInfo,
+    pub file_info: Vec<FileInfo>,
     // 要传输的文件个数
     pub file_cnt: u32,
     //文件添加时间
@@ -201,7 +201,7 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    pub fn to_packet_msg(&self) -> String {
+    pub fn to_fileinfo_msg(&self) -> String {
         let file_name = self.file_name.as_path().file_name().unwrap().to_str().unwrap();
         format!("{}:{}:{:x}:{:x}:{}:", self.file_id, file_name, self.size, self.mtime.second(), self.attr)
     }

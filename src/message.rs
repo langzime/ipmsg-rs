@@ -26,36 +26,39 @@ pub fn send_ipmsg_br_entry(){
 
 ///发送消息
 pub fn send_ipmsg(context :String, files: Arc<RefCell<Vec<model::FileInfo>>>, tar_ip: String){
-    let files = files.borrow().to_vec();
+    let files_clone = files.clone();
+    let files = files_clone.borrow().to_vec();
     GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
-            let commond = if files.len() > 0 { IPMSG_SENDMSG|IPMSG_FILEATTACHOPT } else { IPMSG_SENDMSG };//如果有文件，需要扩展文件
-            let shares = files.iter().map(|file| {
-                let tmp_file = file.clone();
-                model::ShareInfo {
+            let commond = if (&files).len() > 0 { IPMSG_SENDMSG|IPMSG_FILEATTACHOPT } else { IPMSG_SENDMSG };//如果有文件，需要扩展文件
+
+            let share_info = if (&files).len() > 0 {
+                Some(model::ShareInfo {
                     packet_no: Local::now().timestamp() as u32,
                     host: tar_ip.clone(),
                     host_cnt: 1,
-                    file_info: tmp_file,
+                    file_info: files.clone(),
                     file_cnt: 1,
                     attach_time: Local::now().time(),
-                }
-            }).collect::<Vec<model::ShareInfo>>();
-            let files_iter = files.iter().map(|file| { file.to_packet_msg() });
+                })
+            }else {
+                None
+            };
+
             let mut additional = String::new();
-            for (i, file) in files.iter().enumerate() {
-                additional.push_str(file.to_packet_msg().as_str());
+            for (i, file) in (&files).iter().enumerate() {
+                additional.push_str(file.to_fileinfo_msg().as_str());
                 additional.push('\u{7}');
             }
-            GLOBAL_SHARELIST.with(|global_shares| {
-                if let Some(ref share_infos_arc) = *global_shares.borrow() {
-                    let mut share_infos = share_infos_arc.lock().unwrap();
-                    for share in shares {
-                        (*share_infos).push(share);
+            if let Some(share_info) = share_info {
+                GLOBAL_SHARELIST.with(|global_shares| {
+                    if let Some(ref share_infos_arc) = *global_shares.borrow() {
+                        let mut share_infos = share_infos_arc.lock().unwrap();
+                        (*share_infos).push(share_info);
                     }
-                }
-            });
+                });
+            }
             let mut context1: String = context.to_owned();
             context1.push_str(context.as_str());
             context1.push('\u{0}');
