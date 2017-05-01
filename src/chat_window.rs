@@ -19,9 +19,10 @@ pub struct ChatWindow {
     pub win :Window,
     pub his_view :TextView,
     pub ip :String,
+    pub pre_send_files :Arc<RefCell<Vec<model::FileInfo>>>,
 }
 
-pub fn create_chat_window1<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>) -> ChatWindow {
+/*pub fn create_chat_window1<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>) -> ChatWindow {
     let name: String = name.into();
     let host_ip: String = host_ip.into();
     let chat_title = &format!("和{}({})聊天窗口", name, host_ip);
@@ -73,7 +74,7 @@ pub fn create_chat_window1<S: Into<String>>(name :S, host_ip :S, packet: Option<
         let (start_iter, mut end_iter) = text_view_presend.get_buffer().unwrap().get_bounds();
         let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
         println!("{}", context);
-        message::send_ipmsg(context.to_owned(), files_send_clone.borrow().to_vec(), ip_str_1.clone());
+        message::send_ipmsg(context.to_owned(), files_send_clone.clone(), ip_str_1.clone());
         (*files_send_clone.borrow_mut()).clear();
         let (his_start_iter, mut his_end_iter) = clone_hist_view_event.get_buffer().unwrap().get_bounds();
         &clone_hist_view_event.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
@@ -167,7 +168,7 @@ pub fn create_chat_window1<S: Into<String>>(name :S, host_ip :S, packet: Option<
     let clone_chat = chat_window.clone();
     let clone_hist_view = text_view.clone();
     ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str_2}
-}
+}*/
 
 pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>) -> ChatWindow {
     println!("create_chat_window");
@@ -188,6 +189,9 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     chat_window.set_border_width(5);
     let text_view_history: TextView = builder.get_object("text_view_history").unwrap();
     let text_view_presend: TextView = builder.get_object("text_view_presend").unwrap();
+    let tree_view_presend: TreeView = builder.get_object("tree_view_presend").unwrap();
+    append_column(&tree_view_presend, 0, "文件名");
+
 
     if let Some(pac) = packet {
         let additional_section =  pac.additional_section.unwrap();
@@ -200,12 +204,16 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let text_view_presend_clone = text_view_presend.clone();
     let text_view_history_clone = text_view_history.clone();
     let pre_send_files: Arc<RefCell<Vec<model::FileInfo>>> = Arc::new(RefCell::new(Vec::new()));//待发送文件列表
+    let pre_send_files_model = create_and_fill_model();
+    pre_send_files_model.insert_with_values(None, &[0, 1, 2], &[&"cccc", &"aaa", &"bbb"]);
+    tree_view_presend.set_model(Some(&pre_send_files_model));
     let files_send_clone = pre_send_files.clone();
     btn_send.connect_clicked(move|_|{
         let (start_iter, mut end_iter) = text_view_presend_clone.get_buffer().unwrap().get_bounds();
         let context :&str = &text_view_presend_clone.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
-        message::send_ipmsg(context.to_owned(), files_send_clone.borrow().to_vec(), ip_str2.clone());
+        message::send_ipmsg(context.to_owned(), files_send_clone.clone(), ip_str2.clone());
         (*files_send_clone.borrow_mut()).clear();
+        pre_send_files_model.clear();
         let (his_start_iter, mut his_end_iter) = text_view_history_clone.get_buffer().unwrap().get_bounds();
         &text_view_history_clone.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
         &text_view_presend_clone.get_buffer().unwrap().set_text("");
@@ -228,5 +236,27 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     chat_window.show_all();
     let clone_chat = chat_window.clone();
     let clone_hist_view = text_view_history.clone();
-    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str}
+    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files}
+}
+
+fn create_and_setup_view() -> TreeView {
+    let tree = TreeView::new();
+    append_column(&tree, 0, "文件名");
+    tree.set_headers_visible(false);
+    tree
+}
+
+fn append_column(tree: &TreeView, id: i32, title: &str) {
+    let column = TreeViewColumn::new();
+    let cell = CellRendererText::new();
+    column.pack_start(&cell, true);
+    column.set_title(title);
+    column.add_attribute(&cell, "text", id);
+    tree.append_column(&column);
+    tree.set_headers_visible(true);
+}
+
+fn create_and_fill_model() -> ListStore {
+    let model = ListStore::new(&[String::static_type(), String::static_type(), String::static_type()]);
+    model
 }

@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
 use std::thread;
 use std::net::UdpSocket;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
@@ -23,7 +25,8 @@ pub fn send_ipmsg_br_entry(){
 }
 
 ///发送消息
-pub fn send_ipmsg(context :String, files: Vec<model::FileInfo>, tar_ip: String){
+pub fn send_ipmsg(context :String, files: Arc<RefCell<Vec<model::FileInfo>>>, tar_ip: String){
+    let files = files.borrow().to_vec();
     GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
