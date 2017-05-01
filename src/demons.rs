@@ -326,7 +326,7 @@ pub fn make_header(path: &PathBuf) -> String {
 pub fn create_or_open_chat() -> ::glib::Continue {
     GLOBAL_WINDOWS.with(|global| {
         if let Some((ref mut map, ref rx)) = *global.borrow_mut() {
-            if let Ok(((name, host_ip), packet, share)) = rx.try_recv() {
+            if let Ok(((name, host_ip), packet, received_files)) = rx.try_recv() {
                 let select_map = map.clone();
                 if !host_ip.is_empty(){
                     if let Some(chat_win) = select_map.get(&host_ip) {
@@ -335,14 +335,18 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                             let v = additional_section.split('\0').into_iter().collect::<Vec<&str>>();
                             let (start, mut end) = chat_win.his_view.get_buffer().unwrap().get_bounds();
                             chat_win.his_view.get_buffer().unwrap().insert(&mut end, format!("{}:{}\n", pac.sender_name, v[0]).as_str());
-                            //if let Some(ref pre_receive_file_store) = chat_win.pre_receive_file {
-                                //pre_receive_file_store.insert_with_values(None, &[0, 1], &[&&income_user.name, &&income_user.group]);
-                            //}
+                            if let Some(received_files) = received_files {
+                                if let Some(ref pre_receive_file_store) = chat_win.pre_receive_file {
+                                    for file in received_files {
+                                        pre_receive_file_store.insert_with_values(None, &[0, 1], &[&&file.name, &&file.name]);
+                                    }
+                                }
+                            }
                         }
                     }else {
                         let ip_str1 = host_ip.clone();
                         let ip_str2 = host_ip.clone();
-                        let chat_win = chat_window::create_chat_window(name, ip_str1, packet);
+                        let chat_win = chat_window::create_chat_window(name, ip_str1, packet, received_files);
                         map.insert(ip_str2, chat_win);
                     }
                 }

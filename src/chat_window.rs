@@ -11,7 +11,7 @@ use std::path::{PathBuf, Path};
 use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
-use model::{self, Packet, ShareInfo};
+use model::{self, Packet, ShareInfo, SimpleFileInfo};
 use message;
 use app::GLOBAL_WINDOWS;
 
@@ -24,7 +24,7 @@ pub struct ChatWindow {
     pub pre_receive_file :Option<ListStore>,
 }
 
-pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>) -> ChatWindow {
+pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>, received_files: Option<Vec<SimpleFileInfo>>) -> ChatWindow {
     let name: String = name.into();
     let host_ip: String = host_ip.into();
     let ip_str = host_ip.clone();
@@ -180,6 +180,12 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
         });
         Inhibit(false)
     });
+
+    if let Some(received_files) = received_files {
+        for file in received_files {
+            pre_received_files_model.insert_with_values(None, &[0, 1], &[&&file.name, &&file.name]);
+        }
+    }
 
     chat_window.show_all();
     let clone_chat = chat_window.clone();
