@@ -6,11 +6,12 @@ use gtk::{
 };
 use std::sync::{Arc, Mutex};
 use std::cell::RefCell;
+use std::sync::mpsc;
 use std::path::{PathBuf, Path};
 use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
-use model::{self, Packet};
+use model::{self, Packet, ShareInfo};
 use message;
 use app::GLOBAL_WINDOWS;
 
@@ -199,13 +200,15 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
         &text_view_history.get_buffer().unwrap().set_text(format!("{}:{}\n", name, v[0]).as_str());
     }
     let btn_clear: Button = builder.get_object("btn_clear").unwrap();
-    let btn_send: Button = builder.get_object("btn_send").unwrap();
+    let btn_send: Button = builder.get_object("btn_send").unwrap();//btn_file
+    let btn_file: Button = builder.get_object("btn_file").unwrap();
+    let btn_dir: Button = builder.get_object("btn_dir").unwrap();
 
     let text_view_presend_clone = text_view_presend.clone();
     let text_view_history_clone = text_view_history.clone();
     let pre_send_files: Arc<RefCell<Vec<model::FileInfo>>> = Arc::new(RefCell::new(Vec::new()));//待发送文件列表
     let pre_send_files_model = create_and_fill_model();
-    pre_send_files_model.insert_with_values(None, &[0, 1, 2], &[&"cccc", &"aaa", &"bbb"]);
+    //pre_send_files_model.insert_with_values(None, &[0, 1, 2], &[&"cccc", &"aaa", &"bbb"]);
     tree_view_presend.set_model(Some(&pre_send_files_model));
     let files_send_clone = pre_send_files.clone();
     btn_send.connect_clicked(move|_|{
@@ -222,6 +225,86 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let text_view_presend_clone = text_view_presend.clone();
     btn_clear.connect_clicked(move|_|{
         &text_view_presend_clone.get_buffer().unwrap().set_text("");
+    });
+
+    let chat_window_open_file = chat_window.clone();
+    let pre_send_files_open_file = pre_send_files.clone();
+
+    btn_file.connect_clicked(move|_|{
+        let file_chooser = gtk::FileChooserDialog::new(
+            Some("打开文件"), Some(&chat_window_open_file), gtk::FileChooserAction::Open);
+        file_chooser.add_buttons(&[
+            ("选择文件", gtk::ResponseType::Ok.into()),
+            ("取消", gtk::ResponseType::Cancel.into()),
+        ]);
+        if file_chooser.run() == gtk::ResponseType::Ok.into() {
+            let filename: PathBuf = file_chooser.get_filename().unwrap();
+            let metadata: Metadata = fs::metadata(&filename).unwrap();
+            let size = metadata.len();
+            let attr = if metadata.is_file() {
+                ::constant::IPMSG_FILE_REGULAR
+            }else if metadata.is_dir() {
+                ::constant::IPMSG_FILE_DIR
+            }else {
+                panic!("oh no!");
+            };
+            let modify_time: time::SystemTime = metadata.modified().unwrap();
+            let chrono_time = ::util::system_time_to_date_time(modify_time);
+            let local_time = chrono_time.with_timezone(&::chrono::Local);
+            let file_info = model::FileInfo {
+                file_id: Local::now().timestamp() as u32,
+                file_name: filename.clone(),
+                attr: attr as u8,
+                size: size,
+                mtime: Local::now().time(),
+                atime: Local::now().time(),
+                crtime: Local::now().time(),
+                is_selected: false,
+            };
+            let ref mut files_add = *pre_send_files_open_file.borrow_mut();
+            files_add.push(file_info);//添加待发送文件
+        }
+        file_chooser.destroy();
+    });
+
+    let chat_window_open_dir = chat_window.clone();
+    let pre_send_files_open_dir = pre_send_files.clone();
+
+    btn_dir.connect_clicked(move|_|{
+        let file_chooser = gtk::FileChooserDialog::new(
+            Some("打开文件夹"), Some(&chat_window_open_dir), gtk::FileChooserAction::SelectFolder);
+        file_chooser.add_buttons(&[
+            ("选择文件夹", gtk::ResponseType::Ok.into()),
+            ("取消", gtk::ResponseType::Cancel.into()),
+        ]);
+        if file_chooser.run() == gtk::ResponseType::Ok.into() {
+            let filename: PathBuf = file_chooser.get_filename().unwrap();
+            let metadata: Metadata = fs::metadata(&filename).unwrap();
+            let size = metadata.len();
+            let attr = if metadata.is_file() {
+                ::constant::IPMSG_FILE_REGULAR
+            }else if metadata.is_dir() {
+                ::constant::IPMSG_FILE_DIR
+            }else {
+                panic!("oh no!");
+            };
+            let modify_time: time::SystemTime = metadata.modified().unwrap();
+            let chrono_time = ::util::system_time_to_date_time(modify_time);
+            let local_time = chrono_time.with_timezone(&::chrono::Local);
+            let file_info = model::FileInfo {
+                file_id: Local::now().timestamp() as u32,
+                file_name: filename.clone(),
+                attr: attr as u8,
+                size: size,
+                mtime: Local::now().time(),
+                atime: Local::now().time(),
+                crtime: Local::now().time(),
+                is_selected: false,
+            };
+            let ref mut files_add = *pre_send_files_open_dir.borrow_mut();
+            files_add.push(file_info);//添加待发送文件
+        }
+        file_chooser.destroy();
     });
 
     chat_window.connect_delete_event(move|_, _| {
