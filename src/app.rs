@@ -14,13 +14,13 @@ use std::sync::mpsc;
 use std::collections::HashMap;
 use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
-use model::{self, User, OperUser, Operate, ShareInfo, Packet};
+use model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, SimpleFileInfo};
 use chat_window::ChatWindow;
 
 thread_local!(
     pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);//udp全局变量
-    pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<((String, String),Option<Packet>)>)>> = RefCell::new(None);//聊天窗口列表
+    pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<((String, String),Option<Packet>,Option<Vec<SimpleFileInfo>>)>)>> = RefCell::new(None);//聊天窗口列表
     pub static GLOBAL_SHARELIST: RefCell<Option<Arc<Mutex<Vec<ShareInfo>>>>> = RefCell::new(Some(Arc::new(Mutex::new(Vec::new()))));//发送文件列表
     pub static GLOBAL_RECEIVELIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<ShareInfo>)>> = RefCell::new(None);//接收文件列表
 );
@@ -101,7 +101,7 @@ pub fn run(){
         }
     });
 
-    let (remained_sender, remained_receiver): (mpsc::Sender<((String, String), Option<Packet>)>, mpsc::Receiver<((String, String), Option<Packet>)>) = mpsc::channel();
+    let (remained_sender, remained_receiver): (mpsc::Sender<((String, String), Option<Packet>, Option<Vec<SimpleFileInfo>>)>, mpsc::Receiver<((String, String), Option<Packet>, Option<Vec<SimpleFileInfo>>)>) = mpsc::channel();
 
     let remained_sender1 = remained_sender.clone();
     tree.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
@@ -109,7 +109,7 @@ pub fn run(){
         if let Some((model, iter)) = selection.get_selected() {
             let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
             let name = model.get_value(&iter, 0).get::<String>().unwrap();
-            remained_sender1.send(((name, ip_str), None));
+            remained_sender1.send(((name, ip_str), None, None));
             ::glib::idle_add(::demons::create_or_open_chat);
 
         }

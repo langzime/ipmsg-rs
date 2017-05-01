@@ -14,7 +14,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::{PathBuf, Path};
 
 use constant;
-use model::{self, User, OperUser, Operate, ShareInfo};
+use model::{self, User, OperUser, Operate, ShareInfo, FileInfo, SimpleFileInfo};
 use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
@@ -30,13 +30,6 @@ use message;
 use util;
 use chat_window::{self, ChatWindow};
 use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_WINDOWS, GLOBAL};
-
-//文件类型
-enum FileType {
-    FILE,
-    DIR,
-    RET
-}
 
 ///启动消息监听线程
 pub fn start_daemon(sender: mpsc::Sender<Packet>){
@@ -81,7 +74,7 @@ pub fn start_daemon(sender: mpsc::Sender<Packet>){
 }
 
 ///信息处理
-pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>, remained_sender :mpsc::Sender<((String, String), Option<Packet>)>){
+pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>, remained_sender :mpsc::Sender<((String, String), Option<Packet>, Option<Vec<SimpleFileInfo>>)>){
     ::demons::GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
@@ -137,16 +130,17 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         }
                         let msg_str = if ext_vec.len() > 0 { ext_vec[0] } else { "" };
                         //文字消息内容|文件扩展
+                        let mut files_opt: Option<Vec<SimpleFileInfo>> = None;
                         if opt&constant::IPMSG_FILEATTACHOPT != 0 {
                             if ext_vec.len() > 1 {
                                 let files_str: &str = ext_vec[1];
                                 info!("i have file attachment {:?}", files_str);
                                 let files = files_str.split(constant::FILELIST_SEPARATOR).into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                                let mut simple_file_infos = Vec::new();
                                 for file_str in files {
                                     let file_attr = file_str.splitn(6, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                                     if file_attr.len() >= 5 {
-                                        //fileID:filename:size:mtime:fileattr[:extend-attr=val1[,val2...][:extend-attr2=...]]:\a[:]fileID...
-                                        let file_id = file_attr[0];
+                                        let file_id = file_attr[0].parse::<u32>().unwrap();
                                         let file_name = file_attr[1];
                                         let size = file_attr[2];//大小
                                         let mmtime = file_attr[3];//修改时间
@@ -158,13 +152,24 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                                             info!("i am ipmsg_file_regular");
                                         }else if file_attr == constant::IPMSG_FILE_DIR {
                                             info!("i am ipmsg_file_dir");
+                                        }else {
+                                            panic!("no no type")
                                         }
+                                        let simple_file_info = SimpleFileInfo {
+                                            file_id: file_id,
+                                            name: file_name.to_owned(),
+                                            attr: file_attr as u8,
+                                        };
+                                        simple_file_infos.push(simple_file_info);
                                     }
+                                }
+                                if simple_file_infos.len() > 0 {
+                                    files_opt = Some(simple_file_infos);
                                 }
                             };
                         }
                         let packet_clone = packet.clone();
-                        remained_sender.send((((&packet).sender_name.to_owned(), (&packet).ip.to_owned()), Some(packet_clone)));
+                        remained_sender.send((((&packet).sender_name.to_owned(), (&packet).ip.to_owned()), Some(packet_clone), files_opt));
                         ::glib::idle_add(create_or_open_chat);
                     }else {
 
@@ -321,7 +326,7 @@ pub fn make_header(path: &PathBuf) -> String {
 pub fn create_or_open_chat() -> ::glib::Continue {
     GLOBAL_WINDOWS.with(|global| {
         if let Some((ref mut map, ref rx)) = *global.borrow_mut() {
-            if let Ok(((name, host_ip), packet)) = rx.try_recv() {
+            if let Ok(((name, host_ip), packet, share)) = rx.try_recv() {
                 let select_map = map.clone();
                 if !host_ip.is_empty(){
                     if let Some(chat_win) = select_map.get(&host_ip) {

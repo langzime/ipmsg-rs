@@ -109,9 +109,11 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
             let modify_time: time::SystemTime = metadata.modified().unwrap();
             let chrono_time = ::util::system_time_to_date_time(modify_time);
             let local_time = chrono_time.with_timezone(&::chrono::Local);
+            let name = filename.file_name().unwrap().to_str().unwrap();
             let file_info = model::FileInfo {
                 file_id: Local::now().timestamp() as u32,
                 file_name: filename.clone(),
+                name: name.to_owned(),
                 attr: attr as u8,
                 size: size,
                 mtime: Local::now().time(),
@@ -121,8 +123,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
             };
             let ref mut files_add = *pre_send_files_open_file.borrow_mut();
             files_add.push(file_info.clone());//添加待发送文件
-            let filename = &file_info.file_name.file_name().unwrap().to_str().unwrap();
-            pre_send_files_model_file.insert_with_values(None, &[0, 1], &[&filename, &format!("{}", &file_info.file_id)]);
+            pre_send_files_model_file.insert_with_values(None, &[0, 1], &[&&name, &format!("{}", &file_info.file_id)]);
         }
         file_chooser.destroy();
     });
@@ -152,9 +153,11 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
             let modify_time: time::SystemTime = metadata.modified().unwrap();
             let chrono_time = ::util::system_time_to_date_time(modify_time);
             let local_time = chrono_time.with_timezone(&::chrono::Local);
+            let name = filename.file_name().unwrap().to_str().unwrap();
             let file_info = model::FileInfo {
                 file_id: Local::now().timestamp() as u32,
                 file_name: filename.clone(),
+                name: name.to_owned(),
                 attr: attr as u8,
                 size: size,
                 mtime: Local::now().time(),
@@ -164,8 +167,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
             };
             let ref mut files_add = *pre_send_files_open_dir.borrow_mut();
             files_add.push(file_info.clone());//添加待发送文件
-            let filename = &file_info.file_name.file_name().unwrap().to_str().unwrap();
-            pre_send_files_model_dir.insert_with_values(None, &[0, 1], &[&filename, &format!("{}", &file_info.file_id)]);
+            pre_send_files_model_dir.insert_with_values(None, &[0, 1], &[&name, &format!("{}", &file_info.file_id)]);
         }
         file_chooser.destroy();
     });

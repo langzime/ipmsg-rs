@@ -187,6 +187,7 @@ pub struct FileInfo {
     pub file_id: u32,
     //文件名
     pub file_name: PathBuf,
+    pub name: String,
     //文件的属性，如是文件或者文件夹，只读等
     pub attr: u8,// 1 普通文件 2 文件夹
     //文件大小
@@ -205,5 +206,14 @@ impl FileInfo {
         let file_name = self.file_name.as_path().file_name().unwrap().to_str().unwrap();
         format!("{}:{}:{:x}:{:x}:{}:", self.file_id, file_name, self.size, self.mtime.second(), self.attr)
     }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct SimpleFileInfo {
+    //要传输文件id
+    pub file_id: u32,
+    pub name: String,
+    pub attr: u8,// 1 普通文件 2 文件夹
 }
 
