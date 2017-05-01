@@ -88,19 +88,22 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
             thread::spawn(move || {
                 loop {
                     let packet: Packet = receiver.recv().unwrap();
-                    let extstr = packet.clone().additional_section.unwrap_or("".to_owned());
-                    let opt = constant::get_opt(packet.command_no);
-                    let cmd = constant::get_mode(packet.command_no);
-                    info!("{:?}", packet);
-                    info!("{:x}", packet.packet_no.parse::<i32>().unwrap());
+                    let mut extstr = String::new();
+                    if let Some(ref additional_section) = (&packet).additional_section {
+                        extstr = additional_section.to_owned();
+                    }
+                    let opt = constant::get_opt((&packet).command_no);
+                    let cmd = constant::get_mode((&packet).command_no);
+                    info!("{:?}", &packet);
+                    info!("{:x}", &packet.packet_no.parse::<i32>().unwrap());
                     info!("cmd {:x} opt {:x} opt section {:?}", cmd, opt, extstr);
-                    let addr:String = format!("{}:{}", packet.ip, constant::IPMSG_DEFAULT_PORT);
+                    let addr:String = format!("{}:{}", &packet.ip, constant::IPMSG_DEFAULT_PORT);
                     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
-                        let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
+                        let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some((&packet).packet_no.to_string()));
                         socket_clone.send_to(recvmsg.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
                     }
                     if cmd == constant::IPMSG_BR_EXIT {//收到下线通知消息
-                        let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
+                        let user = User::new((&packet).sender_name.to_owned(), (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), "".to_owned());
                         sender.send(OperUser::new(user, Operate::REMOVE));
                         ::glib::idle_add(receive);
                     } else if cmd == constant::IPMSG_BR_ENTRY {//收到上线通知消息
@@ -117,13 +120,13 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         let user_name = if ext_vec.len() > 1&& !ext_vec[0].is_empty() {
                             ext_vec[0].to_owned()
                         }else {
-                            packet.sender_name
+                            (&packet).sender_name.to_owned()
                         };
-                        let user = User::new(user_name, packet.sender_host, packet.ip, group_name);
+                        let user = User::new(user_name, (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), group_name);
                         sender.send(OperUser::new(user, Operate::ADD));
                         ::glib::idle_add(receive);
                     }else if cmd == constant::IPMSG_ANSENTRY {//通报新上线
-                        let user = User::new(packet.sender_name, packet.sender_host, packet.ip, "".to_owned());
+                        let user = User::new((&packet).sender_name.to_owned(), (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), "".to_owned());
                         sender.send(OperUser::new(user, Operate::ADD));
                         ::glib::idle_add(receive);
                     }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
@@ -161,7 +164,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                             };
                         }
                         let packet_clone = packet.clone();
-                        remained_sender.send(((packet.sender_name, packet.ip), Some(packet_clone)));
+                        remained_sender.send((((&packet).sender_name.to_owned(), (&packet).ip.to_owned()), Some(packet_clone)));
                         ::glib::idle_add(create_or_open_chat);
                     }else {
 
