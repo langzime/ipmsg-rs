@@ -1,3 +1,5 @@
+#![crate_type = "lib"]
+#![crate_name = "raudient"]
 
 extern crate gtk;
 extern crate glib;
@@ -15,10 +17,6 @@ mod model;
 mod demons;
 mod message;
 mod util;
-mod app;
 mod chat_window;
+pub mod app;
 
-
-fn main() {
-    app::run();
-}

@@ -26,7 +26,7 @@ thread_local!(
 );
 
 pub fn run(){
-    ::env_logger::init().unwrap();
+    drop(::env_logger::init().unwrap());
     info!("starting up");
     if gtk::init().is_err() {
         info!("Failed to initialize GTK.");
