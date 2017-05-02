@@ -79,6 +79,10 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
         &text_view_presend_clone.get_buffer().unwrap().set_text("");
     });
 
+    tree_view_received.connect_row_activated(move|tree_view, tree_path, tree_view_column|{
+        info!("double click!");
+    });
+
     let text_view_presend_clone = text_view_presend.clone();
     btn_clear.connect_clicked(move|_|{
         &text_view_presend_clone.get_buffer().unwrap().set_text("");
