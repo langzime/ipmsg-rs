@@ -3,7 +3,8 @@ name = "raudient"
 version = "0.1.0"
 authors = ["towangyanqing@gmail.com"]
 description = "Rust language version of ipmessager"
-repository = "https://docs.rs/raudient"
+repository = "https://github.com/wyq756543431/raudient"
+documentation = "https://docs.rs/raudient"
 keywords = ["ipmsg", "ipmessager"]
 license = "MIT"
 
