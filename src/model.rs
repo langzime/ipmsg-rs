@@ -217,3 +217,37 @@ pub struct SimpleFileInfo {
     pub attr: u8,// 1 普通文件 2 文件夹
 }
 
+#[derive(Clone, Debug)]
+pub struct ReceivedPacketInner {
+    ///发送者ip
+    pub ip: String,
+    ///原始packet
+    pub packet: Option<Packet>,
+    ///文件列表
+    pub opt_files: Option<Vec<SimpleFileInfo>>,
+}
+
+impl ReceivedPacketInner {
+    pub fn new<S: Into<String>>(ip: S) -> ReceivedPacketInner {
+        ReceivedPacketInner {
+            ip: ip.into(),
+            packet: None,
+            opt_files: None,
+        }
+    }
+
+    pub fn packet(mut self, packet: Packet) -> ReceivedPacketInner {
+        self.packet = Some(packet);
+        self
+    }
+
+    pub fn opt_files(mut self, opt_files: Vec<SimpleFileInfo>) -> ReceivedPacketInner {
+        self.opt_files = Some(opt_files);
+        self
+    }
+
+    pub fn option_opt_files(mut self, opt_files: Option<Vec<SimpleFileInfo>>) -> ReceivedPacketInner {
+        self.opt_files = opt_files;
+        self
+    }
+}

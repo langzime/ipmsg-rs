@@ -14,7 +14,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::{PathBuf, Path};
 
 use constant;
-use model::{self, User, OperUser, Operate, ShareInfo, FileInfo, SimpleFileInfo};
+use model::{self, User, OperUser, Operate, ShareInfo, FileInfo, SimpleFileInfo, ReceivedPacketInner};
 use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
@@ -74,7 +74,7 @@ pub fn start_daemon(sender: mpsc::Sender<Packet>){
 }
 
 ///信息处理
-pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>, remained_sender :mpsc::Sender<((String, String), Option<Packet>, Option<Vec<SimpleFileInfo>>)>){
+pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>, remained_sender :mpsc::Sender<ReceivedPacketInner>){
     ::demons::GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
@@ -117,7 +117,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         };
                         let user = User::new(user_name, (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), group_name);
                         sender.send(OperUser::new(user, Operate::ADD));
-                        ::glib::idle_add(receive);
+                        ::glib::idle_add(move || receive());
                     }else if cmd == constant::IPMSG_ANSENTRY {//通报新上线
                         let user = User::new((&packet).sender_name.to_owned(), (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), "".to_owned());
                         sender.send(OperUser::new(user, Operate::ADD));
@@ -169,7 +169,8 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                             };
                         }
                         let packet_clone = packet.clone();
-                        remained_sender.send((((&packet).sender_name.to_owned(), (&packet).ip.to_owned()), Some(packet_clone), files_opt));
+                        let received_packet_inner = ReceivedPacketInner::new((&packet).ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
+                        remained_sender.send(received_packet_inner);
                         ::glib::idle_add(create_or_open_chat);
                     }else {
 
@@ -326,7 +327,11 @@ pub fn make_header(path: &PathBuf) -> String {
 pub fn create_or_open_chat() -> ::glib::Continue {
     GLOBAL_WINDOWS.with(|global| {
         if let Some((ref mut map, ref rx)) = *global.borrow_mut() {
-            if let Ok(((name, host_ip), packet, received_files)) = rx.try_recv() {
+            if let Ok(receivedPacketInner) = rx.try_recv() {
+                let host_ip = receivedPacketInner.clone().ip;
+                let name = receivedPacketInner.clone().packet.map(|pac| pac.sender_name).unwrap_or("".to_owned());
+                let received_files = receivedPacketInner.clone().opt_files;
+                let packet = receivedPacketInner.clone().packet;
                 let select_map = map.clone();
                 if !host_ip.is_empty(){
                     if let Some(chat_win) = select_map.get(&host_ip) {

@@ -79,8 +79,27 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
         &text_view_presend_clone.get_buffer().unwrap().set_text("");
     });
 
-    tree_view_received.connect_row_activated(move|tree_view, tree_path, tree_view_column|{
-        info!("double click!");
+    let chat_window_open_save = chat_window.clone();
+    tree_view_received.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
+        let selection = tree_view.get_selection();
+        if let Some((model, iter)) = selection.get_selected() {
+            let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
+            let name = model.get_value(&iter, 0).get::<String>().unwrap();
+            //remained_sender1.send(((name, ip_str), None, None));
+            //::glib::idle_add(::demons::create_or_open_chat);
+            let file_chooser = gtk::FileChooserDialog::new(
+                Some("保存文件"), Some(&chat_window_open_save), gtk::FileChooserAction::Save);
+            file_chooser.add_buttons(&[
+                ("保存", gtk::ResponseType::Ok.into()),
+                ("取消", gtk::ResponseType::Cancel.into()),
+            ]);
+            if file_chooser.run() == gtk::ResponseType::Ok.into() {
+                let filename: PathBuf = file_chooser.get_filename().unwrap();
+                let metadata: Metadata = fs::metadata(&filename).unwrap();
+                info!("{:?}", filename);
+            }
+            file_chooser.destroy();
+        }
     });
 
     let text_view_presend_clone = text_view_presend.clone();
