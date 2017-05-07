@@ -14,7 +14,7 @@ use std::sync::mpsc;
 use std::collections::HashMap;
 use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
-use model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, SimpleFileInfo, ReceivedPacketInner};
+use model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
 use chat_window::ChatWindow;
 
 thread_local!(

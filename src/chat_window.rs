@@ -11,7 +11,7 @@ use std::path::{PathBuf, Path};
 use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
-use model::{self, Packet, ShareInfo, SimpleFileInfo};
+use model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
 use message;
 use app::GLOBAL_WINDOWS;
 
@@ -21,10 +21,11 @@ pub struct ChatWindow {
     pub his_view :TextView,
     pub ip :String,
     pub pre_send_files :Arc<RefCell<Vec<model::FileInfo>>>,
-    pub pre_receive_file :Option<ListStore>,
+    pub received_store :Option<ListStore>,
+    pub received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>>
 }
 
-pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>, received_files: Option<Vec<SimpleFileInfo>>) -> ChatWindow {
+pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>, received_files: Option<Vec<ReceivedSimpleFileInfo>>) -> ChatWindow {
     let name: String = name.into();
     let host_ip: String = host_ip.into();
     let ip_str = host_ip.clone();
@@ -64,7 +65,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let pre_send_files_model = create_and_fill_model();
     let pre_send_files_model_send = pre_send_files_model.clone();
     tree_view_presend.set_model(Some(&pre_send_files_model_send));
-    let pre_received_files_model = create_and_fill_model();
+    let pre_received_files_model = create_and_fill_model1();
     let pre_send_files_model_clone = pre_received_files_model.clone();
     tree_view_received.set_model(Some(&pre_send_files_model_clone));
     let files_send_clone = pre_send_files.clone();
@@ -83,19 +84,18 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     tree_view_received.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
-            let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
             let name = model.get_value(&iter, 0).get::<String>().unwrap();
-            //remained_sender1.send(((name, ip_str), None, None));
-            //::glib::idle_add(::demons::create_or_open_chat);
+            let fid = model.get_value(&iter, 1).get::<u32>().unwrap();
+            let file_type = model.get_value(&iter, 2).get::<u8>().unwrap();
             let file_chooser = gtk::FileChooserDialog::new(
-                Some("保存文件"), Some(&chat_window_open_save), gtk::FileChooserAction::Save);
+                Some("保存文件"), Some(&chat_window_open_save), gtk::FileChooserAction::CreateFolder);
             file_chooser.add_buttons(&[
                 ("保存", gtk::ResponseType::Ok.into()),
                 ("取消", gtk::ResponseType::Cancel.into()),
             ]);
             if file_chooser.run() == gtk::ResponseType::Ok.into() {
                 let filename: PathBuf = file_chooser.get_filename().unwrap();
-                let metadata: Metadata = fs::metadata(&filename).unwrap();
+                //let metadata: Metadata = fs::metadata(&filename).unwrap();
                 info!("{:?}", filename);
             }
             file_chooser.destroy();
@@ -204,16 +204,19 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
         Inhibit(false)
     });
 
-    if let Some(received_files) = received_files {
-        for file in received_files {
-            pre_received_files_model.insert_with_values(None, &[0, 1], &[&&file.name, &&file.name]);
+    let arc_received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>> = Arc::new(RefCell::new(Vec::new()));
+    let arc_received_files_clone = arc_received_files.clone();
+    if let Some(received_files) = received_files.clone() {
+        for file in &received_files {
+            pre_received_files_model.insert_with_values(None, &[0, 1, 2], &[&&file.name, &&file.file_id, &&file.attr]);
         }
+        *arc_received_files_clone.borrow_mut() = received_files;
     }
 
     chat_window.show_all();
     let clone_chat = chat_window.clone();
     let clone_hist_view = text_view_history.clone();
-    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files, pre_receive_file: Some(pre_send_files_model_clone)}
+    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files, received_store: Some(pre_send_files_model_clone), received_files: arc_received_files}
 }
 
 fn append_column(tree: &TreeView, id: i32, title: &str) {
@@ -228,5 +231,10 @@ fn append_column(tree: &TreeView, id: i32, title: &str) {
 
 fn create_and_fill_model() -> ListStore {
     let model = ListStore::new(&[String::static_type(), String::static_type()]);
+    model
+}
+
+fn create_and_fill_model1() -> ListStore {
+    let model = ListStore::new(&[String::static_type(), u32::static_type(), u8::static_type()]);
     model
 }

@@ -14,7 +14,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::{PathBuf, Path};
 
 use constant;
-use model::{self, User, OperUser, Operate, ShareInfo, FileInfo, SimpleFileInfo, ReceivedPacketInner};
+use model::{self, User, OperUser, Operate, ShareInfo, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
 use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
@@ -130,7 +130,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         }
                         let msg_str = if ext_vec.len() > 0 { ext_vec[0] } else { "" };
                         //文字消息内容|文件扩展
-                        let mut files_opt: Option<Vec<SimpleFileInfo>> = None;
+                        let mut files_opt: Option<Vec<ReceivedSimpleFileInfo>> = None;
                         if opt&constant::IPMSG_FILEATTACHOPT != 0 {
                             if ext_vec.len() > 1 {
                                 let files_str: &str = ext_vec[1];
@@ -155,10 +155,11 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                                         }else {
                                             panic!("no no type")
                                         }
-                                        let simple_file_info = SimpleFileInfo {
+                                        let simple_file_info = ReceivedSimpleFileInfo {
                                             file_id: file_id,
                                             name: file_name.to_owned(),
                                             attr: file_attr as u8,
+                                            is_active: 0,
                                         };
                                         simple_file_infos.push(simple_file_info);
                                     }
@@ -341,9 +342,34 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                             let (start, mut end) = chat_win.his_view.get_buffer().unwrap().get_bounds();
                             chat_win.his_view.get_buffer().unwrap().insert(&mut end, format!("{}:{}\n", pac.sender_name, v[0]).as_str());
                             if let Some(received_files) = received_files {
-                                if let Some(ref pre_receive_file_store) = chat_win.pre_receive_file {
+                                if let Some(ref pre_receive_file_store) = chat_win.received_store {
                                     for file in received_files {
-                                        pre_receive_file_store.insert_with_values(None, &[0, 1], &[&&file.name, &&file.name]);
+                                        let file_received_id = file.file_id;
+                                        let mut in_flag = false;
+                                        if let Some(first) = pre_receive_file_store.get_iter_first(){
+                                            let mut num :u32 = pre_receive_file_store.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                                            let file_id = pre_receive_file_store.get_value(&first, 1).get::<u32>().unwrap();
+                                            if file_id == file_received_id {
+                                                in_flag = true;
+                                            }else {
+                                                loop {
+                                                    num = num + 1;
+                                                    if let Some(next_iter) = pre_receive_file_store.get_iter_from_string(&num.to_string()){
+                                                        let next_file_id = pre_receive_file_store.get_value(&next_iter, 1).get::<u32>().unwrap();
+                                                        if next_file_id == file_received_id {
+                                                            in_flag = true;
+                                                            break;
+                                                        }
+                                                    }else{
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if !in_flag {
+                                            pre_receive_file_store.insert_with_values(None, &[0, 1, 2], &[&&file.name, &&file.file_id, &&file.attr]);
+                                        }
                                     }
                                 }
                             }

@@ -210,11 +210,12 @@ impl FileInfo {
 
 
 #[derive(Clone, Debug)]
-pub struct SimpleFileInfo {
+pub struct ReceivedSimpleFileInfo {
     //要传输文件id
     pub file_id: u32,
     pub name: String,
     pub attr: u8,// 1 普通文件 2 文件夹
+    pub is_active: u8, // 0 pre, 1 ing, 2 finish
 }
 
 #[derive(Clone, Debug)]
@@ -224,7 +225,7 @@ pub struct ReceivedPacketInner {
     ///原始packet
     pub packet: Option<Packet>,
     ///文件列表
-    pub opt_files: Option<Vec<SimpleFileInfo>>,
+    pub opt_files: Option<Vec<ReceivedSimpleFileInfo>>,
 }
 
 impl ReceivedPacketInner {
@@ -241,12 +242,12 @@ impl ReceivedPacketInner {
         self
     }
 
-    pub fn opt_files(mut self, opt_files: Vec<SimpleFileInfo>) -> ReceivedPacketInner {
+    pub fn opt_files(mut self, opt_files: Vec<ReceivedSimpleFileInfo>) -> ReceivedPacketInner {
         self.opt_files = Some(opt_files);
         self
     }
 
-    pub fn option_opt_files(mut self, opt_files: Option<Vec<SimpleFileInfo>>) -> ReceivedPacketInner {
+    pub fn option_opt_files(mut self, opt_files: Option<Vec<ReceivedSimpleFileInfo>>) -> ReceivedPacketInner {
         self.opt_files = opt_files;
         self
     }
