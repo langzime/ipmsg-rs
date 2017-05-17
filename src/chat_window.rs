@@ -64,6 +64,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
 
     let text_view_presend_clone = text_view_presend.clone();
     let text_view_history_clone = text_view_history.clone();
+    let arc_received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>> = Arc::new(RefCell::new(Vec::new()));
     let pre_send_files: Arc<RefCell<Vec<model::FileInfo>>> = Arc::new(RefCell::new(Vec::new()));//待发送文件列表
     let pre_send_files_model = create_and_fill_model();
     let pre_send_files_model_send = pre_send_files_model.clone();
@@ -104,7 +105,9 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
                 let target_ip = format!("{}:{}", ip_str4, constant::IPMSG_DEFAULT_PORT);
                 info!("choosed {:?} {:?} {:?} {:?} {:?}", name, fid, pid, base_filename.clone(), file_type);
                 thread::spawn(move || {
-                    ::file::download(target_ip, base_filename_clone, pid, fid, name, file_type as u32);
+                    if let Ok(_) = ::download::download(target_ip, base_filename_clone, pid, fid, name, file_type as u32) {
+                        //::成功删除
+                    }
                 });
             }
             file_chooser.destroy();
@@ -213,7 +216,6 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
         Inhibit(false)
     });
 
-    let arc_received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>> = Arc::new(RefCell::new(Vec::new()));
     let arc_received_files_clone = arc_received_files.clone();
     if let Some(received_files) = received_files.clone() {
         for file in &received_files {
@@ -247,4 +249,9 @@ fn create_and_fill_model() -> ListStore {
 fn create_and_fill_model1() -> ListStore {
     let model = ListStore::new(&[String::static_type(), u32::static_type(), u32::static_type(), u8::static_type()]);
     model
+}
+
+fn modify_received_list(received_store :Option<ListStore>, received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>>) -> ::glib::Continue {
+
+    ::glib::Continue(false)
 }

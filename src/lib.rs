@@ -18,6 +18,6 @@ mod demons;
 mod message;
 mod util;
 mod chat_window;
-mod file;
+mod download;
 pub mod app;
 
