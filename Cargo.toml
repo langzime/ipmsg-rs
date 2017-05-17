@@ -1,6 +1,6 @@
 [package]
 name = "raudient"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["towangyanqing@gmail.com"]
 description = "Rust language version of ipmessager"
 repository = "https://github.com/wyq756543431/raudient"
