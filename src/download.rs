@@ -74,14 +74,13 @@ pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, packet_id
     }else if file_type == IPMSG_FILE_DIR {
         let mut base_file_location = path.to_path_buf();
         let mut buffer = BufReader::new(stream);
-        download_file(&mut buffer, &base_file_location);
+        download_file(&mut buffer, &mut base_file_location);
     }
     Ok(())
 }
 
-fn download_file<S>(mut stream : & mut BufReader<TcpStream>, next_base_path: S) -> Result<(), DownLoadError> where S: AsRef<Path> {
+fn download_file(mut stream : & mut BufReader<TcpStream>, mut next_path: &mut PathBuf) -> Result<(), DownLoadError> {
     if let Some(header_size_str) = read_delimiter(stream)? {
-        let mut next_path: PathBuf = next_base_path.as_ref().to_path_buf();
         let header_size = u64::from_str_radix(&header_size_str, 16).unwrap();
         info!("header_size {:?}", header_size);
         let header_context_str = read_bytes(&mut stream, (header_size - 1 - header_size_str.as_bytes().len() as u64));//-1是减去的那个冒号
@@ -98,17 +97,17 @@ fn download_file<S>(mut stream : & mut BufReader<TcpStream>, next_base_path: S) 
                 fs::create_dir(&next_path)?;
             }
             info!("crate dir{:?}", next_path);
-            download_file(&mut stream, next_path)
+            download_file(&mut stream, &mut next_path)
         }else if cmd == IPMSG_FILE_REGULAR {
-            let tmp_path = next_path.clone();
-            info!("base dir {:?}", tmp_path);
             next_path.push(file_name);
+            info!("crate file{:?}", next_path);
             read_bytes_to_file(&mut stream, file_size, &next_path);
-            download_file(&mut stream, tmp_path)
+            next_path.pop();
+            download_file(&mut stream, &mut next_path)
         }else if cmd == IPMSG_FILE_RETPARENT  {
             info!("back to parent");
             next_path.pop();
-            download_file(&mut stream, next_path)
+            download_file(&mut stream, &mut next_path)
         }else {
             Err(DownLoadError::InValidType)
         }
@@ -139,8 +138,8 @@ fn read_bytes(mut stream : & mut BufReader<TcpStream>, len: u64) -> String {
     GB18030.decode(s_buffer.as_slice(), DecoderTrap::Ignore).unwrap()
 }
 
-fn read_bytes_to_file<S>(mut stream : & mut BufReader<TcpStream>, len: u64, file_path: S) where S: AsRef<Path> {
-    let mut f: File = File::create(&file_path).unwrap();
+fn read_bytes_to_file(mut stream : & mut BufReader<TcpStream>, len: u64, file_path: &PathBuf) {
+    let mut f: File = File::create(file_path).unwrap();
     info!("file len {:?}", len);
     let mut handler = stream.take(len as u64);
     let mut buf = [0; 1024 * 4];
