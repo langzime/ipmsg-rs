@@ -33,15 +33,9 @@ pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, packet_id
             file.write(&buffer[0..num])?;
         }
     }else if file_type == IPMSG_FILE_DIR {
-        //header-size:filename:file-size:fileattr:contents-data
         let mut base_file_location = path.to_path_buf();
-        base_file_location.push(name);
-        if !base_file_location.exists() {
-            fs::create_dir(&base_file_location)?;
-        }
-        let root_path = base_file_location;
         let mut buffer = BufReader::new(stream);
-        download_file(&mut buffer, &root_path);
+        download_file(&mut buffer, &base_file_location);
     }
     Ok(())
 }
@@ -68,12 +62,9 @@ fn download_file<S>(mut stream : & mut BufReader<TcpStream>, next_base_path: S) 
             let tmp_path = next_path.clone();
             info!("base dir {:?}", tmp_path);
             next_path.push(file_name);
-            //create path
             read_bytes_to_file(&mut stream, file_size, &next_path);
-            //传入下一个的是目录，可能得在去掉文件名，在往下传
             download_file(&mut stream, tmp_path)?;
         }else if file_attr == IPMSG_FILE_RETPARENT  {
-            //root 从哪里读取
             info!("back to parent");
             next_path.pop();
             download_file(&mut stream, next_path)?;
