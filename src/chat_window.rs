@@ -7,12 +7,14 @@ use gtk::{
 use std::sync::{Arc, Mutex};
 use std::cell::RefCell;
 use std::sync::mpsc;
+use std::thread;
 use std::path::{PathBuf, Path};
 use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
 use message;
+use constant;
 use app::GLOBAL_WINDOWS;
 
 #[derive(Clone)]
@@ -32,6 +34,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let ip_str1 = host_ip.clone();
     let ip_str2 = host_ip.clone();
     let ip_str3 = host_ip.clone();
+    let ip_str4 = host_ip.clone();
     let chat_title = &format!("和{}({})聊天窗口", name, host_ip);
 
     let glade_src = include_str!("chat_window.glade");
@@ -81,12 +84,14 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     });
 
     let chat_window_open_save = chat_window.clone();
+    //let pre_send_files_model_clone1 = pre_received_files_model.clone();
     tree_view_received.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
             let name = model.get_value(&iter, 0).get::<String>().unwrap();
             let fid = model.get_value(&iter, 1).get::<u32>().unwrap();
-            let file_type = model.get_value(&iter, 2).get::<u8>().unwrap();
+            let pid = model.get_value(&iter, 2).get::<u32>().unwrap();
+            let file_type = model.get_value(&iter, 3).get::<u8>().unwrap();
             let file_chooser = gtk::FileChooserDialog::new(
                 Some("保存文件"), Some(&chat_window_open_save), gtk::FileChooserAction::CreateFolder);
             file_chooser.add_buttons(&[
@@ -94,9 +99,13 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
                 ("取消", gtk::ResponseType::Cancel.into()),
             ]);
             if file_chooser.run() == gtk::ResponseType::Ok.into() {
-                let filename: PathBuf = file_chooser.get_filename().unwrap();
-                //let metadata: Metadata = fs::metadata(&filename).unwrap();
-                info!("{:?}", filename);
+                let base_filename: PathBuf = file_chooser.get_filename().unwrap();
+                let base_filename_clone = base_filename.clone();
+                let target_ip = format!("{}:{}", ip_str4, constant::IPMSG_DEFAULT_PORT);
+                info!("choosed {:?} {:?} {:?} {:?} {:?}", name, fid, pid, base_filename.clone(), file_type);
+                thread::spawn(move || {
+                    ::file::download(target_ip, base_filename_clone, pid, fid, name, file_type as u32);
+                });
             }
             file_chooser.destroy();
         }
@@ -208,7 +217,8 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let arc_received_files_clone = arc_received_files.clone();
     if let Some(received_files) = received_files.clone() {
         for file in &received_files {
-            pre_received_files_model.insert_with_values(None, &[0, 1, 2], &[&&file.name, &&file.file_id, &&file.attr]);
+            info!("init {}  {}", file.packet_id, file.file_id);
+            pre_received_files_model.insert_with_values(None, &[0, 1, 2, 3], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr]);
         }
         *arc_received_files_clone.borrow_mut() = received_files;
     }
@@ -235,6 +245,6 @@ fn create_and_fill_model() -> ListStore {
 }
 
 fn create_and_fill_model1() -> ListStore {
-    let model = ListStore::new(&[String::static_type(), u32::static_type(), u8::static_type()]);
+    let model = ListStore::new(&[String::static_type(), u32::static_type(), u32::static_type(), u8::static_type()]);
     model
 }

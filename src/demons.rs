@@ -157,6 +157,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                                         }
                                         let simple_file_info = ReceivedSimpleFileInfo {
                                             file_id: file_id,
+                                            packet_id: (&packet).packet_no.parse::<u32>().unwrap(),
                                             name: file_name.to_owned(),
                                             attr: file_attr as u8,
                                             is_active: 0,
@@ -344,19 +345,23 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                             if let Some(received_files) = received_files {
                                 if let Some(ref pre_receive_file_store) = chat_win.received_store {
                                     for file in received_files {
-                                        let file_received_id = file.file_id;
+                                        let received_file_id = file.file_id;
+                                        let received_packet_id = file.packet_id;
+                                        info!(" {}  {}", received_packet_id, received_file_id);
                                         let mut in_flag = false;
                                         if let Some(first) = pre_receive_file_store.get_iter_first(){
                                             let mut num :u32 = pre_receive_file_store.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
                                             let file_id = pre_receive_file_store.get_value(&first, 1).get::<u32>().unwrap();
-                                            if file_id == file_received_id {
+                                            let packet_id = pre_receive_file_store.get_value(&first, 2).get::<u32>().unwrap();
+                                            if file_id == received_file_id&&packet_id == received_packet_id {
                                                 in_flag = true;
                                             }else {
                                                 loop {
                                                     num = num + 1;
                                                     if let Some(next_iter) = pre_receive_file_store.get_iter_from_string(&num.to_string()){
                                                         let next_file_id = pre_receive_file_store.get_value(&next_iter, 1).get::<u32>().unwrap();
-                                                        if next_file_id == file_received_id {
+                                                        let next_packet_id = pre_receive_file_store.get_value(&next_iter, 2).get::<u32>().unwrap();
+                                                        if next_file_id == received_file_id&&next_packet_id == received_packet_id {
                                                             in_flag = true;
                                                             break;
                                                         }
@@ -368,7 +373,7 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                                         }
 
                                         if !in_flag {
-                                            pre_receive_file_store.insert_with_values(None, &[0, 1, 2], &[&&file.name, &&file.file_id, &&file.attr]);
+                                            pre_receive_file_store.insert_with_values(None, &[0, 1, 2, 3], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr]);
                                         }
                                     }
                                 }
