@@ -9,20 +9,22 @@ use std::fs::{self, File, Metadata, ReadDir};
 use std::net::ToSocketAddrs;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
-use constant::{IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT};
+use constant::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT};
 use model::Packet;
 
 #[derive(Debug)]
 pub enum DownLoadError {
     IoError(io::Error),
     InValidType,
+    ReaDelimiterErr,
 }
 
 impl Display for DownLoadError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             DownLoadError::IoError(ref err) => err.fmt(f),
-            DownLoadError::InValidType => write!(f, "InValidType")
+            DownLoadError::InValidType => write!(f, "InValidType"),
+            DownLoadError::ReaDelimiterErr => write!(f, "ReaDelimiterErr")
         }
     }
 }
@@ -32,11 +34,13 @@ impl Error for DownLoadError {
         match *self {
             DownLoadError::IoError(ref err) => err.description(),
             DownLoadError::InValidType => "InValidType",
+            DownLoadError::ReaDelimiterErr => "DownLoadError"
         } }
     fn cause(&self) -> Option<&Error> {
         match *self {
             DownLoadError::IoError(ref err) => Some(err),
-            DownLoadError::InValidType => None
+            DownLoadError::InValidType => None,
+            DownLoadError::ReaDelimiterErr => None
         }
     }
 }
@@ -83,23 +87,25 @@ fn download_file<S>(mut stream : & mut BufReader<TcpStream>, next_base_path: S) 
         let header_context_str = read_bytes(&mut stream, (header_size - 1 - header_size_str.as_bytes().len() as u64));//-1是减去的那个冒号
         let v: Vec<&str> = header_context_str.splitn(4, |c| c == ':').collect();
         let file_name = v[0];
-        let file_size = u64::from_str_radix(v[1], 16).unwrap();;
-        let file_attr = v[2].parse::<u32>().unwrap();
+        let file_size = u64::from_str_radix(v[1], 16).unwrap();
+        let file_attr = u32::from_str_radix(v[2], 16).unwrap();
+        let opt = constant::get_opt(file_attr);
+        let cmd = constant::get_mode(file_attr);
         info!("header context {:?}", v);
-        if file_attr == IPMSG_FILE_DIR {
+        if cmd == IPMSG_FILE_DIR {
             next_path.push(file_name);
             if !next_path.exists() {
                 fs::create_dir(&next_path)?;
             }
             info!("crate dir{:?}", next_path);
             download_file(&mut stream, next_path)
-        }else if file_attr == IPMSG_FILE_REGULAR {
+        }else if cmd == IPMSG_FILE_REGULAR {
             let tmp_path = next_path.clone();
             info!("base dir {:?}", tmp_path);
             next_path.push(file_name);
             read_bytes_to_file(&mut stream, file_size, &next_path);
             download_file(&mut stream, tmp_path)
-        }else if file_attr == IPMSG_FILE_RETPARENT  {
+        }else if cmd == IPMSG_FILE_RETPARENT  {
             info!("back to parent");
             next_path.pop();
             download_file(&mut stream, next_path)
@@ -116,9 +122,13 @@ fn read_delimiter(mut stream : & mut BufReader<TcpStream>) -> Result<Option<Stri
     let len = stream.read_until(b':', &mut s_buffer)?;
     if len != 0usize {
         s_buffer.pop();
-        Ok(Some(GB18030.decode(s_buffer.as_slice(), DecoderTrap::Ignore).unwrap()))
+        Ok(Some(String::from_utf8(s_buffer).unwrap()))
     }else {
-        Ok(None)
+        if len > 20 {
+            Err(DownLoadError::ReaDelimiterErr)
+        }else {
+            Ok(None)
+        }
     }
 }
 
@@ -131,9 +141,11 @@ fn read_bytes(mut stream : & mut BufReader<TcpStream>, len: u64) -> String {
 
 fn read_bytes_to_file<S>(mut stream : & mut BufReader<TcpStream>, len: u64, file_path: S) where S: AsRef<Path> {
     let mut f: File = File::create(&file_path).unwrap();
+    info!("file len {:?}", len);
     let mut handler = stream.take(len as u64);
     let mut buf = [0; 1024 * 4];
     while let Ok(bytes_read) = handler.read(&mut buf) {
+        info!("file in ...");
         if bytes_read == 0 { break; }
         f.write(&buf[..bytes_read]);
     }

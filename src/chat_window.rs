@@ -107,6 +107,8 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
                 thread::spawn(move || {
                     if let Ok(_) = ::download::download(target_ip, base_filename_clone, pid, fid, name, file_type as u32) {
                         //::成功删除
+                    }else {
+                        error!("download error!!");
                     }
                 });
             }
