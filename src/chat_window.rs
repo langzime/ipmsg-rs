@@ -35,6 +35,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let ip_str2 = host_ip.clone();
     let ip_str3 = host_ip.clone();
     let ip_str4 = host_ip.clone();
+    let ip_str5 = host_ip.clone();
     let chat_title = &format!("和{}({})聊天窗口", name, host_ip);
 
     let glade_src = include_str!("chat_window.glade");
@@ -104,9 +105,15 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
                 let base_filename_clone = base_filename.clone();
                 let target_ip = format!("{}:{}", ip_str4, constant::IPMSG_DEFAULT_PORT);
                 info!("choosed {:?} {:?} {:?} {:?} {:?}", name, fid, pid, base_filename.clone(), file_type);
-                thread::spawn(move || {
-                    if let Ok(_) = ::download::download(target_ip, base_filename_clone, pid, fid, name, file_type as u32) {
+                let p1 = pid.clone();
+                let f1 = fid.clone();
+                let p2 = pid.clone();
+                let f2 = fid.clone();
+                let in_ip = ip_str5.clone();
+                thread::spawn(move|| {
+                    if let Ok(_) = ::download::download(target_ip, base_filename_clone, p1, f1, name, file_type as u32) {
                         //::成功删除
+                        ::glib::idle_add(move || ::demons::remove_downloaded_file(&in_ip, p2, f2));
                     }else {
                         error!("download error!!");
                     }
@@ -253,6 +260,7 @@ fn create_and_fill_model1() -> ListStore {
     model
 }
 
+/// ip
 fn modify_received_list(received_store :Option<ListStore>, received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>>) -> ::glib::Continue {
 
     ::glib::Continue(false)

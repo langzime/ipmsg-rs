@@ -392,6 +392,49 @@ pub fn create_or_open_chat() -> ::glib::Continue {
     ::glib::Continue(false)
 }
 
+///
+///
+pub fn remove_downloaded_file(host_ip: &str, pid: u32, fid: u32) -> ::glib::Continue {
+    GLOBAL_WINDOWS.with(|global| {
+        if let Some((ref mut map, _)) = *global.borrow_mut() {
+            let select_map = map.clone();
+            if !host_ip.is_empty() {
+                if let Some(chat_win) = select_map.get(host_ip) {
+                    if let Some(ref pre_receive_file_store) = chat_win.received_store {
+                        let received_file_id = fid;
+                        let received_packet_id = pid;
+                        info!(" {}  {}", received_packet_id, received_file_id);
+                        let mut in_flag = false;
+                        if let Some(first) = pre_receive_file_store.get_iter_first(){
+                            let mut num :u32 = pre_receive_file_store.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                            let file_id = pre_receive_file_store.get_value(&first, 1).get::<u32>().unwrap();
+                            let packet_id = pre_receive_file_store.get_value(&first, 2).get::<u32>().unwrap();
+                            if file_id == received_file_id&&packet_id == received_packet_id {
+                                pre_receive_file_store.remove(&first);
+                            }else {
+                                loop {
+                                    num = num + 1;
+                                    if let Some(next_iter) = pre_receive_file_store.get_iter_from_string(&num.to_string()){
+                                        let next_file_id = pre_receive_file_store.get_value(&next_iter, 1).get::<u32>().unwrap();
+                                        let next_packet_id = pre_receive_file_store.get_value(&next_iter, 2).get::<u32>().unwrap();
+                                        if next_file_id == received_file_id&&next_packet_id == received_packet_id {
+                                            pre_receive_file_store.remove(&next_iter);
+                                            break;
+                                        }
+                                    }else{
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+    ::glib::Continue(false)
+}
+
 fn receive() -> ::glib::Continue {
     GLOBAL.with(|global| {
         if let Some((ref store, ref rx)) = *global.borrow() {
