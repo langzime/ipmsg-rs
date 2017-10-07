@@ -29,7 +29,7 @@ use gtk::{
 use message;
 use util;
 use chat_window::{self, ChatWindow};
-use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_WINDOWS, GLOBAL_USERLIST};
+use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_CHATWINDOWS, GLOBAL_USERLIST};
 
 ///启动消息监听线程
 pub fn start_daemon(sender: mpsc::Sender<Packet>){
@@ -327,7 +327,7 @@ pub fn make_header(path: &PathBuf) -> String {
 }
 
 pub fn create_or_open_chat() -> ::glib::Continue {
-    GLOBAL_WINDOWS.with(|global| {
+    GLOBAL_CHATWINDOWS.with(|global| {
         if let Some((ref mut map, ref rx)) = *global.borrow_mut() {
             if let Ok(receivedPacketInner) = rx.try_recv() {
                 let host_ip = receivedPacketInner.clone().ip;
@@ -395,7 +395,7 @@ pub fn create_or_open_chat() -> ::glib::Continue {
 ///
 ///
 pub fn remove_downloaded_file(host_ip: &str, pid: u32, fid: u32) -> ::glib::Continue {
-    GLOBAL_WINDOWS.with(|global| {
+    GLOBAL_CHATWINDOWS.with(|global| {
         if let Some((ref mut map, _)) = *global.borrow_mut() {
             let select_map = map.clone();
             if !host_ip.is_empty() {

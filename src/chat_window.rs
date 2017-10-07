@@ -15,7 +15,7 @@ use chrono::prelude::*;
 use model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
 use message;
 use constant;
-use app::GLOBAL_WINDOWS;
+use app::GLOBAL_CHATWINDOWS;
 
 #[derive(Clone)]
 pub struct ChatWindow {
@@ -217,7 +217,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     });
 
     chat_window.connect_delete_event(move|_, _| {
-        GLOBAL_WINDOWS.with(|global| {
+        GLOBAL_CHATWINDOWS.with(|global| {
             if let Some((ref mut map1, _)) = *global.borrow_mut() {
                 map1.remove(&ip_str1);
             }
