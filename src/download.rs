@@ -141,7 +141,7 @@ fn read_delimiter(mut stream : & mut BufReader<TcpStream>) -> Result<Option<Stri
     let mut s_buffer = Vec::new();
     let len = stream.read_until(b':', &mut s_buffer)?;
     if len != 0usize {
-        if len > 20 {
+        if len > 200 {
             Err(DownLoadError::ReaDelimiterErr)
         }else {
             s_buffer.pop();

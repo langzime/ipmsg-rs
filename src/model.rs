@@ -203,8 +203,10 @@ pub struct FileInfo {
 
 impl FileInfo {
     pub fn to_fileinfo_msg(&self) -> String {
-        let file_name = self.file_name.as_path().file_name().unwrap().to_str().unwrap();
-        format!("{}:{}:{:x}:{:x}:{}:", self.file_id, file_name, self.size, self.mtime.second(), self.attr)
+        self.file_name.as_path().file_name()
+            .and_then(|name| { name.to_str() })
+            .map(|file_name| { format!("{}:{}:{:x}:{:x}:{}:", self.file_id, file_name, self.size, self.mtime.second(), self.attr) }).unwrap()
+
     }
 }
 

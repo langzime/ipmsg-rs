@@ -16,7 +16,7 @@ name = "raudient"
 path = "src/bin/raudient.rs"
 
 [dependencies]
-chrono = "0.3.0"
+chrono = "0.4.0"
 hostname = "0.1.3"
 local-ip = "0.1.0"
 encoding = "0.2.33"

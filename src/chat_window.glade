@@ -112,6 +112,7 @@
               <object class="GtkTextView" id="text_view_presend">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <property name="editable">True</property>
                 <property name="buffer">textbuffer1</property>
               </object>
             </child>
