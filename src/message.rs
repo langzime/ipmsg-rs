@@ -7,7 +7,7 @@ use encoding::all::GB18030;
 use chrono::prelude::*;
 use model::{self, Packet};
 use constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT};
-use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_WINDOWS, GLOBAL};
+use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_WINDOWS, GLOBAL_USERLIST};
 
 ///启动发送上线消息
 pub fn send_ipmsg_br_entry() {

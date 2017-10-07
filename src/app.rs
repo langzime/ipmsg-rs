@@ -18,7 +18,7 @@ use model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, Received
 use chat_window::ChatWindow;
 
 thread_local!(
-    pub static GLOBAL: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
+    pub static GLOBAL_USERLIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);//udp全局变量
     pub static GLOBAL_WINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<ReceivedPacketInner>)>> = RefCell::new(None);//聊天窗口列表
     pub static GLOBAL_SHARELIST: RefCell<Option<Arc<Mutex<Vec<ShareInfo>>>>> = RefCell::new(Some(Arc::new(Mutex::new(Vec::new()))));//发送文件列表
@@ -117,7 +117,7 @@ pub fn run(){
     let (user_add_sender, user_list_receiver) = mpsc::channel();
     let new_user_sender_clone = user_add_sender.clone();
     // put ListStore and receiver in thread local storage
-    GLOBAL.with(move |global| {
+    GLOBAL_USERLIST.with(move |global| {
         *global.borrow_mut() = Some((model, user_list_receiver))
     });
 

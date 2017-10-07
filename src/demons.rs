@@ -29,7 +29,7 @@ use gtk::{
 use message;
 use util;
 use chat_window::{self, ChatWindow};
-use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_WINDOWS, GLOBAL};
+use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_WINDOWS, GLOBAL_USERLIST};
 
 ///启动消息监听线程
 pub fn start_daemon(sender: mpsc::Sender<Packet>){
@@ -436,7 +436,7 @@ pub fn remove_downloaded_file(host_ip: &str, pid: u32, fid: u32) -> ::glib::Cont
 }
 
 fn receive() -> ::glib::Continue {
-    GLOBAL.with(|global| {
+    GLOBAL_USERLIST.with(|global| {
         if let Some((ref store, ref rx)) = *global.borrow() {
             if let Ok(op_user) = rx.try_recv() {
                 let income_user = op_user.user;
