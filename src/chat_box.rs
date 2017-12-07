@@ -13,11 +13,11 @@ use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
-use message;
+//use message;
 use constant;
-use app::GLOBAL_CHATWINDOWS;
+//use app::GLOBAL_CHATWINDOWS;
 
-#[derive(Clone)]
+/*#[derive(Clone)]
 pub struct ChatWindow {
     pub win :Window,
     pub his_view :TextView,
@@ -25,9 +25,19 @@ pub struct ChatWindow {
     pub pre_send_files :Arc<RefCell<Vec<model::FileInfo>>>,
     pub received_store :Option<ListStore>,
     pub received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>>
+}*/
+
+#[derive(Clone)]
+pub struct ChatBox {
+    pub win :Window,
+    pub his_view :TextView,
+    pub ip :String,
+    //pub pre_send_store :ListStore,
+    //pub received_store :ListStore,
 }
 
-pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>, received_files: Option<Vec<ReceivedSimpleFileInfo>>) -> ChatWindow {
+
+pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>) -> ChatBox {
     let name: String = name.into();
     let host_ip: String = host_ip.into();
     let ip_str = host_ip.clone();
@@ -74,16 +84,16 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let pre_send_files_model_clone = pre_received_files_model.clone();
     tree_view_received.set_model(Some(&pre_send_files_model_clone));
     let files_send_clone = pre_send_files.clone();
-    btn_send.connect_clicked(move|_|{
-        let (start_iter, mut end_iter) = text_view_presend_clone.get_buffer().unwrap().get_bounds();
-        let context :&str = &text_view_presend_clone.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
-        message::send_ipmsg(context.to_owned(), files_send_clone.clone(), ip_str2.clone());
-        (*files_send_clone.borrow_mut()).clear();
-        pre_send_files_model_send.clear();
-        let (his_start_iter, mut his_end_iter) = text_view_history_clone.get_buffer().unwrap().get_bounds();
-        &text_view_history_clone.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
-        &text_view_presend_clone.get_buffer().unwrap().set_text("");
-    });
+//    btn_send.connect_clicked(move|_|{
+//        let (start_iter, mut end_iter) = text_view_presend_clone.get_buffer().unwrap().get_bounds();
+//        let context :&str = &text_view_presend_clone.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
+//        message::send_ipmsg(context.to_owned(), files_send_clone.clone(), ip_str2.clone());
+//        (*files_send_clone.borrow_mut()).clear();
+//        pre_send_files_model_send.clear();
+//        let (his_start_iter, mut his_end_iter) = text_view_history_clone.get_buffer().unwrap().get_bounds();
+//        &text_view_history_clone.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
+//        &text_view_presend_clone.get_buffer().unwrap().set_text("");
+//    });
 
     let chat_window_open_save = chat_window.clone();
     //let pre_send_files_model_clone1 = pre_received_files_model.clone();
@@ -110,14 +120,14 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
                 let p2 = pid.clone();
                 let f2 = fid.clone();
                 let in_ip = ip_str5.clone();
-                thread::spawn(move|| {
-                    if let Ok(_) = ::download::download(target_ip, base_filename_clone, p1, f1, name, file_type as u32) {
-                        //::成功删除
-                        ::glib::idle_add(move || ::demons::remove_downloaded_file(&in_ip, p2, f2));
-                    }else {
-                        error!("download error!!");
-                    }
-                });
+//                thread::spawn(move|| {
+//                    if let Ok(_) = ::download::download(target_ip, base_filename_clone, p1, f1, name, file_type as u32) {
+//                        //::成功删除
+//                        ::glib::idle_add(move || ::demons::remove_downloaded_file(&in_ip, p2, f2));
+//                    }else {
+//                        error!("download error!!");
+//                    }
+//                });
             }
             file_chooser.destroy();
         }
@@ -217,27 +227,27 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     });
 
     chat_window.connect_delete_event(move|_, _| {
-        GLOBAL_CHATWINDOWS.with(|global| {
-            if let Some((ref mut map1, _)) = *global.borrow_mut() {
-                map1.remove(&ip_str1);
-            }
-        });
+//        GLOBAL_CHATWINDOWS.with(|global| {
+//            if let Some((ref mut map1, _)) = *global.borrow_mut() {
+//                map1.remove(&ip_str1);
+//            }
+//        });
         Inhibit(false)
     });
 
-    let arc_received_files_clone = arc_received_files.clone();
-    if let Some(received_files) = received_files.clone() {
-        for file in &received_files {
-            info!("init {}  {}", file.packet_id, file.file_id);
-            pre_received_files_model.insert_with_values(None, &[0, 1, 2, 3], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr]);
-        }
-        *arc_received_files_clone.borrow_mut() = received_files;
-    }
+//    let arc_received_files_clone = arc_received_files.clone();
+//    if let Some(received_files) = received_files.clone() {
+//        for file in &received_files {
+//            info!("init {}  {}", file.packet_id, file.file_id);
+//            pre_received_files_model.insert_with_values(None, &[0, 1, 2, 3], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr]);
+//        }
+//        *arc_received_files_clone.borrow_mut() = received_files;
+//    }
 
     chat_window.show_all();
     let clone_chat = chat_window.clone();
     let clone_hist_view = text_view_history.clone();
-    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files, received_store: Some(pre_send_files_model_clone), received_files: arc_received_files}
+    ChatBox{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str}
 }
 
 fn append_column(tree: &TreeView, id: i32, title: &str) {

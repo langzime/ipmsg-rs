@@ -28,7 +28,7 @@ use gtk::{
 };
 use message;
 use util;
-use chat_window::{self, ChatWindow};
+use chat_box::{self, ChatWindow};
 use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_CHATWINDOWS, GLOBAL_USERLIST};
 
 ///启动消息监听线程
@@ -382,7 +382,7 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                     }else {
                         let ip_str1 = host_ip.clone();
                         let ip_str2 = host_ip.clone();
-                        let chat_win = chat_window::create_chat_window(name, ip_str1, packet, received_files);
+                        let chat_win = chat_box::create_chat_window(name, ip_str1, packet, received_files);
                         map.insert(ip_str2, chat_win);
                     }
                 }

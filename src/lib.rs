@@ -13,10 +13,10 @@ extern crate env_logger;
 
 mod constant;
 mod model;
-mod demons;
-mod message;
+//mod demons;
+//mod message;
 mod util;
-mod chat_window;
-mod download;
+mod chat_box;
+//mod download;
 pub mod app;
 
