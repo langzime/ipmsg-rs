@@ -1,6 +1,6 @@
 use gtk::prelude::*;
 use gtk::{
-    self, CellRendererText, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
+    self, CellRendererText, CellRendererProgress, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
     WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
     ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment,
 };
@@ -14,6 +14,8 @@ use std::sync::mpsc;
 use std::collections::HashMap;
 use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::env::args;
+use gio::{ApplicationExt, ApplicationExtManual};
 use model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
 use chat_window::ChatWindow;
 
@@ -26,6 +28,19 @@ thread_local!(
 );
 
 pub fn run(){
+    let application = gtk::Application::new("com.github.raudient",
+                                            ::gio::ApplicationFlags::empty())
+        .expect("Initialization failed...");
+
+    application.connect_startup(move |app| {
+        build_ui(app);
+    });
+    application.connect_activate(|_| {});
+
+    application.run(&args().collect::<Vec<_>>());
+}
+
+pub fn build_ui(application: &gtk::Application){
     drop(::env_logger::init().unwrap());
     info!("starting up");
     if gtk::init().is_err() {

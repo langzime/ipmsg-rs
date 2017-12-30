@@ -60,7 +60,6 @@ pub fn send_ipmsg(context :String, files: Arc<RefCell<Vec<model::FileInfo>>>, ta
                 });
             }
             let mut context1: String = context.to_owned();
-            context1.push_str(context.as_str());
             context1.push('\u{0}');
             context1.push_str(additional.as_str());
             context1.push('\u{0}');

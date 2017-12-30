@@ -2,6 +2,7 @@
 #![crate_name = "raudient"]
 
 extern crate gtk;
+extern crate gio;
 extern crate glib;
 extern crate chrono;
 extern crate encoding;

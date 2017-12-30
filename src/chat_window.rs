@@ -2,7 +2,7 @@ use gtk::prelude::*;
 use gtk::{
     self, CellRendererText, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
     WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment, ButtonBox,
+    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment, ButtonBox, WrapMode
 };
 use std::sync::{Arc, Mutex};
 use std::cell::RefCell;
@@ -16,6 +16,24 @@ use model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
 use message;
 use constant;
 use app::GLOBAL_CHATWINDOWS;
+
+// make moving clones into closures more convenient
+macro_rules! clone {
+    (@param _) => ( _ );
+    (@param $x:ident) => ( $x );
+    ($($n:ident),+ => move || $body:expr) => (
+        {
+            $( let $n = $n.clone(); )+
+            move || $body
+        }
+    );
+    ($($n:ident),+ => move |$($p:tt),+| $body:expr) => (
+        {
+            $( let $n = $n.clone(); )+
+            move |$(clone!(@param $p),)+| $body
+        }
+    );
+}
 
 #[derive(Clone)]
 pub struct ChatWindow {
@@ -31,7 +49,6 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let name: String = name.into();
     let host_ip: String = host_ip.into();
     let ip_str = host_ip.clone();
-    let ip_str1 = host_ip.clone();
     let ip_str2 = host_ip.clone();
     let ip_str3 = host_ip.clone();
     let ip_str4 = host_ip.clone();
@@ -49,6 +66,8 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let text_view_presend: TextView = builder.get_object("text_view_presend").unwrap();
     let tree_view_presend: TreeView = builder.get_object("tree_view_presend").unwrap();//tree_view_received
     let tree_view_received: TreeView = builder.get_object("tree_view_received").unwrap();
+    text_view_history.set_wrap_mode(WrapMode::WordChar);
+    text_view_presend.set_wrap_mode(WrapMode::WordChar);
     append_column(&tree_view_presend, 0, "待发送文件");
     append_column(&tree_view_received, 0, "收到的文件");
 
@@ -216,14 +235,14 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
         file_chooser.destroy();
     });
 
-    chat_window.connect_delete_event(move|_, _| {
+    chat_window.connect_delete_event(clone!(ip_str => move|_, _| {
         GLOBAL_CHATWINDOWS.with(|global| {
             if let Some((ref mut map1, _)) = *global.borrow_mut() {
-                map1.remove(&ip_str1);
+                map1.remove(&ip_str);
             }
         });
         Inhibit(false)
-    });
+    }));
 
     let arc_received_files_clone = arc_received_files.clone();
     if let Some(received_files) = received_files.clone() {
