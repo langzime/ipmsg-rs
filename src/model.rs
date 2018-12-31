@@ -1,6 +1,6 @@
 use std::net::TcpStream;
 use chrono::prelude::*;
-use constant::{self, IPMSG_VERSION};
+use crate::constant::{self, IPMSG_VERSION};
 use std::path::{PathBuf, Path};
 
 ///

@@ -5,9 +5,9 @@ use std::net::UdpSocket;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use chrono::prelude::*;
-use model::{self, Packet};
-use constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT};
-use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_CHATWINDOWS, GLOBAL_USERLIST};
+use crate::model::{self, Packet};
+use crate::constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT};
+use crate::app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_CHATWINDOWS, GLOBAL_USERLIST};
 
 ///启动发送上线消息
 pub fn send_ipmsg_br_entry() {
@@ -67,7 +67,7 @@ pub fn send_ipmsg(context :String, files: Arc<RefCell<Vec<model::FileInfo>>>, ta
             info!("send message {:?}", packet);
             thread::spawn(move||{
                 let addr:String = format!("{}:{}", tar_ip, IPMSG_DEFAULT_PORT);
-                socket_clone.send_to(::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str());
+                socket_clone.send_to(crate::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str());
             });
         }
     });

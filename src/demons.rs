@@ -1,7 +1,6 @@
 
 use std::str;
 use std::thread;
-use model::Packet;
 use std::net::UdpSocket;
 use std::net::{TcpStream, TcpListener};
 use std::sync::mpsc;
@@ -13,8 +12,8 @@ use std::fs::{self, File, Metadata, ReadDir};
 use std::io::{BufReader, BufWriter};
 use std::path::{PathBuf, Path};
 
-use constant;
-use model::{self, User, OperUser, Operate, ShareInfo, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
+use crate::constant;
+use crate::model::{self, User, Packet, OperUser, Operate, ShareInfo, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
 use chrono::prelude::*;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
@@ -26,14 +25,14 @@ use gtk::{
     WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
     ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment,
 };
-use message;
-use util;
-use chat_window::{self, ChatWindow};
-use app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_CHATWINDOWS, GLOBAL_USERLIST};
+use crate::message;
+use crate::util;
+use crate::chat_window::{self, ChatWindow};
+use crate::app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_CHATWINDOWS, GLOBAL_USERLIST};
 
 ///启动消息监听线程
 pub fn start_daemon(sender: mpsc::Sender<Packet>){
-    ::demons::GLOBAL_UDPSOCKET.with(|global| {
+    crate::demons::GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
             thread::spawn(move||{
@@ -75,7 +74,7 @@ pub fn start_daemon(sender: mpsc::Sender<Packet>){
 
 ///信息处理
 pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::Sender<OperUser>, remained_sender :mpsc::Sender<ReceivedPacketInner>){
-    ::demons::GLOBAL_UDPSOCKET.with(|global| {
+    crate::demons::GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
             thread::spawn(move || {
@@ -174,6 +173,10 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         let received_packet_inner = ReceivedPacketInner::new((&packet).ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
                         remained_sender.send(received_packet_inner);
                         ::glib::idle_add(create_or_open_chat);
+                    }else if cmd == constant::IPMSG_NOOPERATION {
+                        info!("i am IPMSG_NOOPERATION");
+                    }else if cmd == constant::IPMSG_BR_ABSENCE {
+                        info!("i am IPMSG_BR_ABSENCE");
                     }else {
 
                     }

@@ -7,6 +7,7 @@ repository = "https://github.com/wyq756543431/raudient"
 documentation = "https://docs.rs/raudient"
 keywords = ["ipmsg", "ipmessager"]
 license = "MIT"
+edition = "2018"
 
 [lib]
 name = "raudient"
@@ -16,21 +17,30 @@ name = "raudient"
 path = "src/bin/raudient.rs"
 
 [dependencies]
-chrono = "0.4.0"
-hostname = "0.1.3"
+chrono = "0.4.4"
+hostname = "0.1.5"
 local-ip = "0.1.0"
 encoding = "0.2.33"
 lazy_static = "1.0.0"
 log = "0.3"
 env_logger = "0.3"
-quick-error = "1.2.0"
-gio = "0.3.0"
+quick-error = "1.2.2"
+gio = "0.5.0"
+generator = "0.6.10"
 #nom = "2.2.1"
 
 [dependencies.gtk]
-version = "0.3.0"
+version = "0.5.0"
 #git = "https://github.com/gtk-rs/gtk.git"
 
 [dependencies.glib]
-version = "0.4.0"
+version = "0.6.0"
 #git = "https://github.com/gtk-rs/glib"
+
+[features]
+default = ["gtk_3_22", "gtk_3_20", "gtk_3_18", "gtk_3_16", "gtk_3_10"]
+gtk_3_10 = ["gtk/v3_10"]
+gtk_3_16 = ["gtk_3_10", "gtk/v3_16"]
+gtk_3_18 = ["gtk_3_16", "gtk/v3_18"] #for CI tools
+gtk_3_20 = ["gtk_3_18", "gtk/v3_20"] #for CI tools
+gtk_3_22 = ["gtk_3_20", "gtk/v3_22"] #for CI tools

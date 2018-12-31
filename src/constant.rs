@@ -21,7 +21,7 @@ pub const IPMSG_BR_ABSENCE: u32 = 0x00000004;
 pub const IPMSG_BR_ISGETLIST: u32 = 0x00000010;
 ///主机列表发送通知
 pub const IPMSG_OKGETLIST: u32 = 0x00000011;
-//主机列表发送请求
+///主机列表发送请求
 pub const IPMSG_GETLIST: u32 = 0x00000012;
 ///主机列表发送
 pub const IPMSG_ANSLIST: u32 = 0x00000013;

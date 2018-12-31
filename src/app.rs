@@ -2,7 +2,7 @@ use gtk::prelude::*;
 use gtk::{
     self, CellRendererText, CellRendererProgress, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
     WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment,
+    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment, ListBox, ListBoxRow,
 };
 
 use chrono::prelude::*;
@@ -16,8 +16,8 @@ use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::env::args;
 use gio::{ApplicationExt, ApplicationExtManual};
-use model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
-use chat_window::ChatWindow;
+use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
+use crate::chat_window::ChatWindow;
 
 thread_local!(
     pub static GLOBAL_USERLIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
@@ -28,6 +28,7 @@ thread_local!(
 );
 
 pub fn run(){
+    ::std::env::set_var("RUST_LOG", "debug");
     let application = gtk::Application::new("com.github.raudient",
                                             ::gio::ApplicationFlags::empty())
         .expect("Initialization failed...");
@@ -48,7 +49,7 @@ pub fn build_ui(application: &gtk::Application){
         return;
     }
 
-    let window = Window::new(gtk::WindowType::Toplevel);
+    let window: Window = Window::new(gtk::WindowType::Toplevel);
     window.set_title("飞鸽传书");
     window.set_position(gtk::WindowPosition::Center);
     window.set_default_size(200, 500);
@@ -70,15 +71,6 @@ pub fn build_ui(application: &gtk::Application){
     menu_sys.append(&quit);
     sytem_item.set_submenu(Some(&menu_sys));
     menu_bar.append(&sytem_item);
-
-//    let window_item = MenuItem::new_with_label("窗口");
-//    let menu_window = Menu::new();
-//    let send_file = MenuItem::new_with_label("发送文件");
-//    let manage_file = MenuItem::new_with_label("管理文件");
-//    menu_window.append(&send_file);
-//    menu_window.append(&manage_file);
-//    window_item.set_submenu(Some(&menu_window));
-//    menu_bar.append(&window_item);
 
     let window_about = window.clone();
     about.connect_activate(move |_| {
@@ -125,7 +117,7 @@ pub fn build_ui(application: &gtk::Application){
             let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
             let name = model.get_value(&iter, 0).get::<String>().unwrap();
             remained_sender1.send(ReceivedPacketInner::new(ip_str));
-            ::glib::idle_add(::demons::create_or_open_chat);
+            ::glib::idle_add(crate::demons::create_or_open_chat);
         }
     });
 
@@ -138,9 +130,9 @@ pub fn build_ui(application: &gtk::Application){
 
     //let addr: String = format!("{}{}", "0.0.0.0:", constant::IPMSG_DEFAULT_PORT);
 
-    let socket: UdpSocket = match UdpSocket::bind(::constant::addr.as_str()) {
+    let socket: UdpSocket = match UdpSocket::bind(crate::constant::addr.as_str()) {
         Ok(s) => {
-            info!("udp server start listening! {:?}", ::constant::addr.as_str());
+            info!("udp server start listening! {:?}", crate::constant::addr.as_str());
             s
         },
         Err(e) => panic!("couldn't bind socket: {}", e)
@@ -159,12 +151,12 @@ pub fn build_ui(application: &gtk::Application){
 
     let packet_sender_clone = packet_sender.clone();
     //接收消息守护线程
-    ::demons::start_daemon(packet_sender_clone);
-    ::demons::start_file_processer();
+    crate::demons::start_daemon(packet_sender_clone);
+    crate::demons::start_file_processer();
     //消息处理守护线程
-    ::demons::start_message_processer(packet_receiver, new_user_sender_clone, remained_sender.clone());
+    crate::demons::start_message_processer(packet_receiver, new_user_sender_clone, remained_sender.clone());
     //启动发送上线消息
-    ::message::send_ipmsg_br_entry();
+    crate::message::send_ipmsg_br_entry();
 
     window.add(&v_box);
     window.show_all();

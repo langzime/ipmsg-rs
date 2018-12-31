@@ -9,8 +9,8 @@ use std::fs::{self, File, Metadata, ReadDir};
 use std::net::ToSocketAddrs;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
-use constant::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT};
-use model::Packet;
+use crate::constant::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT};
+use crate::model::Packet;
 
 #[derive(Debug)]
 pub enum DownLoadError {

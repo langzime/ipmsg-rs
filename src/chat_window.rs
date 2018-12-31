@@ -12,10 +12,10 @@ use std::path::{PathBuf, Path};
 use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
-use model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
-use message;
-use constant;
-use app::GLOBAL_CHATWINDOWS;
+use crate::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
+use crate::message;
+use crate::constant;
+use crate::app::GLOBAL_CHATWINDOWS;
 
 // make moving clones into closures more convenient
 macro_rules! clone {
@@ -109,10 +109,10 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     tree_view_received.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
-            let name = model.get_value(&iter, 0).get::<String>().unwrap();
-            let fid = model.get_value(&iter, 1).get::<u32>().unwrap();
-            let pid = model.get_value(&iter, 2).get::<u32>().unwrap();
-            let file_type = model.get_value(&iter, 3).get::<u8>().unwrap();
+            let name = model.get_value(&iter, 0).get().unwrap();
+            let fid: u32 = model.get_value(&iter, 1).get().unwrap();
+            let pid: u32 = model.get_value(&iter, 2).get().unwrap();
+            let file_type: u8 = model.get_value(&iter, 3).get().unwrap();
             let file_chooser = gtk::FileChooserDialog::new(
                 Some("保存文件"), Some(&chat_window_open_save), gtk::FileChooserAction::CreateFolder);
             file_chooser.add_buttons(&[
@@ -130,9 +130,9 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
                 let f2 = fid.clone();
                 let in_ip = ip_str5.clone();
                 thread::spawn(move|| {
-                    if let Ok(_) = ::download::download(target_ip, base_filename_clone, p1, f1, name, file_type as u32) {
+                    if let Ok(_) = crate::download::download(target_ip, base_filename_clone, p1, f1, name, file_type as u32) {
                         //::成功删除
-                        ::glib::idle_add(move || ::demons::remove_downloaded_file(&in_ip, p2, f2));
+                        ::glib::idle_add(move || crate::demons::remove_downloaded_file(&in_ip, p2, f2));
                     }else {
                         error!("download error!!");
                     }
@@ -163,14 +163,14 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
             let metadata: Metadata = fs::metadata(&filename).unwrap();
             let size = metadata.len();
             let attr = if metadata.is_file() {
-                ::constant::IPMSG_FILE_REGULAR
+                crate::constant::IPMSG_FILE_REGULAR
             }else if metadata.is_dir() {
-                ::constant::IPMSG_FILE_DIR
+                crate::constant::IPMSG_FILE_DIR
             }else {
                 panic!("oh no!");
             };
             let modify_time: time::SystemTime = metadata.modified().unwrap();
-            let chrono_time = ::util::system_time_to_date_time(modify_time);
+            let chrono_time = crate::util::system_time_to_date_time(modify_time);
             let local_time = chrono_time.with_timezone(&::chrono::Local);
             let name = filename.file_name().unwrap().to_str().unwrap();
             let file_info = model::FileInfo {
@@ -207,14 +207,14 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
             let metadata: Metadata = fs::metadata(&filename).unwrap();
             let size = metadata.len();
             let attr = if metadata.is_file() {
-                ::constant::IPMSG_FILE_REGULAR
+                crate::constant::IPMSG_FILE_REGULAR
             }else if metadata.is_dir() {
-                ::constant::IPMSG_FILE_DIR
+                crate::constant::IPMSG_FILE_DIR
             }else {
                 panic!("oh no!");
             };
             let modify_time: time::SystemTime = metadata.modified().unwrap();
-            let chrono_time = ::util::system_time_to_date_time(modify_time);
+            let chrono_time = crate::util::system_time_to_date_time(modify_time);
             let local_time = chrono_time.with_timezone(&::chrono::Local);
             let name = filename.file_name().unwrap().to_str().unwrap();
             let file_info = model::FileInfo {
