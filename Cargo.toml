@@ -25,22 +25,24 @@ lazy_static = "1.0.0"
 log = "0.3"
 env_logger = "0.3"
 quick-error = "1.2.2"
-gio = "0.5.0"
-generator = "0.6.10"
+crossbeam-channel = "^0.3"
+gio = "0.6.0"
+gdk-pixbuf = "^0.6.0"
+#generator = "0.6.10"
 #nom = "2.2.1"
 
 [dependencies.gtk]
-version = "0.5.0"
+version = "0.6.0"
 #git = "https://github.com/gtk-rs/gtk.git"
 
 [dependencies.glib]
-version = "0.6.0"
+version = "0.7.0"
 #git = "https://github.com/gtk-rs/glib"
 
 [features]
-default = ["gtk_3_22", "gtk_3_20", "gtk_3_18", "gtk_3_16", "gtk_3_10"]
-gtk_3_10 = ["gtk/v3_10"]
-gtk_3_16 = ["gtk_3_10", "gtk/v3_16"]
+default = ["gtk_3_24", "gtk_3_22", "gtk_3_20", "gtk_3_18", "gtk_3_16"]
+gtk_3_16 = ["gtk/v3_16"]
 gtk_3_18 = ["gtk_3_16", "gtk/v3_18"] #for CI tools
 gtk_3_20 = ["gtk_3_18", "gtk/v3_20"] #for CI tools
-gtk_3_22 = ["gtk_3_20", "gtk/v3_22"] #for CI tools
+gtk_3_22 = ["gtk_3_20", "gtk/v3_22_30"] #for CI tools
+gtk_3_24 = ["gtk_3_22", "gtk/v3_24"] #for CI tools

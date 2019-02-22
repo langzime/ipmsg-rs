@@ -1,10 +1,3 @@
-use gtk::prelude::*;
-use gtk::{
-    self, CellRendererText, CellRendererProgress, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
-    WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment, ListBox, ListBoxRow,
-};
-
 use chrono::prelude::*;
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
@@ -16,8 +9,19 @@ use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::env::args;
 use gio::{ApplicationExt, ApplicationExtManual};
+use gtk::prelude::*;
+use gtk::{
+    self, CellRendererText, CellRendererProgress, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
+    WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
+    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment, ListBox, ListBoxRow
+};
+use gdk_pixbuf::Pixbuf;
+use glib::Receiver;
+use crossbeam_channel::unbounded;
+
 use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
 use crate::chat_window::ChatWindow;
+use crate::events::{ui::UiEvent, model::ModelEvent};
 
 thread_local!(
     pub static GLOBAL_USERLIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
@@ -49,6 +53,9 @@ pub fn build_ui(application: &gtk::Application){
         return;
     }
 
+    let (tx, rx): (glib::Sender<UiEvent>, glib::Receiver<UiEvent>) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+    let (model_sender, model_receiver): (crossbeam_channel::Sender<ModelEvent>, crossbeam_channel::Receiver<ModelEvent>) = unbounded();
+
     let window: Window = Window::new(gtk::WindowType::Toplevel);
     window.set_title("飞鸽传书");
     window.set_position(gtk::WindowPosition::Center);
@@ -78,6 +85,7 @@ pub fn build_ui(application: &gtk::Application){
         p.set_website_label(Some("ipmsg"));
         p.set_website(Some("https://www.langzi.me"));
         p.set_authors(&["langzi"]);
+        p.set_logo(&Pixbuf::new_from_file("./resources/eye.png").unwrap());
         p.set_title("关于");
         p.set_transient_for(Some(&window_about));
         p.run();
@@ -90,7 +98,7 @@ pub fn build_ui(application: &gtk::Application){
     });
 
     let label = Label::new("");
-    let scrolled = ScrolledWindow::new(None, None);
+    let scrolled = ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
     scrolled.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     let tree = create_and_setup_view();
     let model = create_and_fill_model();
@@ -100,11 +108,14 @@ pub fn build_ui(application: &gtk::Application){
     v_box.add(&menu_bar);
     v_box.add(&scrolled);
     v_box.add(&label);
+    model_sender.send(ModelEvent::UserListSelected(String::from("未选择"))).unwrap();
 
     tree.connect_cursor_changed(move |tree_view| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
-            &label.set_text(&format!("-- {} --", model.get_value(&iter, 0).get::<String>().unwrap()));
+            let str1 = model.get_value(&iter, 0).get::<String>().unwrap();
+            //&label.set_text(&format!("-- {} --", model.get_value(&iter, 0).get::<String>().unwrap()));
+            model_sender.send(ModelEvent::UserListSelected(str1)).unwrap();
         }
     });
 
@@ -157,6 +168,37 @@ pub fn build_ui(application: &gtk::Application){
     crate::demons::start_message_processer(packet_receiver, new_user_sender_clone, remained_sender.clone());
     //启动发送上线消息
     crate::message::send_ipmsg_br_entry();
+
+    thread::spawn(move || {
+        while let Ok(ev) = model_receiver.recv() {
+            match ev {
+                ModelEvent::UserListSelected(text) => {
+                    tx.send(UiEvent::UpdateUserListFooterStatus(text)).unwrap();
+                }
+                _ => {
+                    println!("{}", "aa");
+                }
+            }
+        }
+    });
+
+    rx.attach(None, move |event| {
+        match event {
+            UiEvent::AddEntry(_) => {
+
+            }
+            UiEvent::ShowEntry(i) => {
+
+            }
+            UiEvent::UpdateUserListFooterStatus(text) => {
+                &label.set_text(&format!("-- {} --", text));
+            }
+            _ => {
+                println!("{}", "aaa");
+            }
+        };
+        glib::Continue(true)
+    });
 
     window.add(&v_box);
     window.show_all();

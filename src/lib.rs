@@ -10,8 +10,8 @@ extern crate gio;
 extern crate glib;
 extern crate chrono;
 extern crate encoding;
-#[macro_use]
-extern crate generator;
+//#[macro_use]
+//extern crate generator;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate env_logger;
@@ -25,5 +25,6 @@ mod message;
 mod util;
 mod chat_window;
 mod download;
+mod events;
 pub mod app;
 
