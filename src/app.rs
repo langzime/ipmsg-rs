@@ -21,7 +21,25 @@ use crossbeam_channel::unbounded;
 
 use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
 use crate::chat_window::ChatWindow;
-use crate::events::{ui::UiEvent, model::ModelEvent};
+use crate::events::{ui::UiEvent, model::ModelEvent, model::model_run};
+
+// make moving clones into closures more convenient
+macro_rules! clone {
+    (@param _) => ( _ );
+    (@param $x:ident) => ( $x );
+    ($($n:ident),+ => move || $body:expr) => (
+        {
+            $( let $n = $n.clone(); )+
+                move || $body
+        }
+    );
+    ($($n:ident),+ => move |$($p:tt),+| $body:expr) => (
+        {
+            $( let $n = $n.clone(); )+
+                move |$(clone!(@param $p),)+| $body
+        }
+    );
+}
 
 thread_local!(
     pub static GLOBAL_USERLIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
@@ -108,38 +126,29 @@ pub fn build_ui(application: &gtk::Application){
     v_box.add(&menu_bar);
     v_box.add(&scrolled);
     v_box.add(&label);
-    model_sender.send(ModelEvent::UserListSelected(String::from("未选择"))).unwrap();
+    model_sender.clone().send(ModelEvent::UserListSelected(String::from("未选择"))).unwrap();
 
-    tree.connect_cursor_changed(move |tree_view| {
+    tree.connect_cursor_changed(clone!(model_sender => move |tree_view| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
             let str1 = model.get_value(&iter, 0).get::<String>().unwrap();
-            //&label.set_text(&format!("-- {} --", model.get_value(&iter, 0).get::<String>().unwrap()));
             model_sender.send(ModelEvent::UserListSelected(str1)).unwrap();
         }
-    });
+    }));
 
     let (remained_sender, remained_receiver): (mpsc::Sender<ReceivedPacketInner>, mpsc::Receiver<ReceivedPacketInner>) = mpsc::channel();
 
+    let mut chat_windows: HashMap<String, ChatWindow> = HashMap::new();
+
     let remained_sender1 = remained_sender.clone();
-    tree.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
+    tree.connect_row_activated(clone!(model_sender => move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
             let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
             let name = model.get_value(&iter, 0).get::<String>().unwrap();
-            remained_sender1.send(ReceivedPacketInner::new(ip_str));
-            ::glib::idle_add(crate::demons::create_or_open_chat);
+            model_sender.send(ModelEvent::UserListDoubleClicked{name, ip: ip_str }).unwrap();
         }
-    });
-
-    let (user_add_sender, user_list_receiver) = mpsc::channel();
-    let new_user_sender_clone = user_add_sender.clone();
-    // put ListStore and receiver in thread local storage
-    GLOBAL_USERLIST.with(move |global| {
-        *global.borrow_mut() = Some((model, user_list_receiver))
-    });
-
-    //let addr: String = format!("{}{}", "0.0.0.0:", constant::IPMSG_DEFAULT_PORT);
+    }));
 
     let socket: UdpSocket = match UdpSocket::bind(crate::constant::addr.as_str()) {
         Ok(s) => {
@@ -149,10 +158,6 @@ pub fn build_ui(application: &gtk::Application){
         Err(e) => panic!("couldn't bind socket: {}", e)
     };
 
-    GLOBAL_UDPSOCKET.with(move |global| {
-        *global.borrow_mut() = Some(socket.try_clone().unwrap());
-    });
-
     ///待处理消息队列
     let (packet_sender, packet_receiver): (mpsc::Sender<Packet>, mpsc::Receiver<Packet>) = mpsc::channel();
 
@@ -160,38 +165,109 @@ pub fn build_ui(application: &gtk::Application){
         *global.borrow_mut() = Some((HashMap::new(), remained_receiver));
     });
 
-    let packet_sender_clone = packet_sender.clone();
     //接收消息守护线程
-    crate::demons::start_daemon(packet_sender_clone);
-    crate::demons::start_file_processer();
-    //消息处理守护线程
-    crate::demons::start_message_processer(packet_receiver, new_user_sender_clone, remained_sender.clone());
-    //启动发送上线消息
-    crate::message::send_ipmsg_br_entry();
-
-    thread::spawn(move || {
-        while let Ok(ev) = model_receiver.recv() {
-            match ev {
-                ModelEvent::UserListSelected(text) => {
-                    tx.send(UiEvent::UpdateUserListFooterStatus(text)).unwrap();
-                }
-                _ => {
-                    println!("{}", "aa");
-                }
-            }
-        }
-    });
+    //crate::demons::start_file_processer();
+    model_run(socket.try_clone().unwrap(), model_receiver, model_sender.clone(),tx);
 
     rx.attach(None, move |event| {
         match event {
-            UiEvent::AddEntry(_) => {
-
-            }
-            UiEvent::ShowEntry(i) => {
-
+            UiEvent::OpenOrReOpenChatWindow {name, ip} => {
+                println!("{} {}", name, ip.clone());
+                match &chat_windows.get(&ip) {
+                    Some(win) => {
+                        //&window.set_focus(Some(v_box));
+                        //win.win.show();
+                    }
+                    None => {
+                        let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone(), None);
+                        &chat_windows.insert(ip.clone(), chat_win);
+                    }
+                }
             }
             UiEvent::UpdateUserListFooterStatus(text) => {
                 &label.set_text(&format!("-- {} --", text));
+            }
+            UiEvent::UserListRemoveOne(ip) => {
+                if let Some(first) = model.get_iter_first(){//拿出来第一条
+                    let mut num :u32 = model.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                    let ip1 = model.get_value(&first, 3).get::<String>().unwrap();//获取ip
+                    if ip == ip1 {
+                        model.remove(&first);
+                    }else {
+                        loop {
+                            num = num + 1;
+                            if let Some(next_iter) = model.get_iter_from_string(&num.to_string()){
+                                let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
+                                if next_ip == ip1 {
+                                    model.remove(&next_iter);
+                                    break;
+                                }
+                            }else{
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            UiEvent::UserListAddOne(income_user) => {
+                let mut in_flag = false;
+                if let Some(first) = model.get_iter_first(){//拿出来第一条
+                    let mut num :u32 = model.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                    let ip = model.get_value(&first, 3).get::<String>().unwrap();//获取ip
+                    if ip == income_user.ip {
+                        in_flag = true;
+                    }else {
+                        loop {
+                            num = num + 1;
+                            if let Some(next_iter) = model.get_iter_from_string(&num.to_string()){
+                                let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
+                                if next_ip == income_user.ip {
+                                    in_flag = true;
+                                    break;
+                                }
+                            }else{
+                                break;
+                            }
+                        }
+                    }
+                }
+                if !in_flag {
+                    model.insert_with_values(None, &[0, 1, 2, 3], &[&&income_user.name, &&income_user.group, &&income_user.host, &&income_user.ip]);
+                }
+            }
+            UiEvent::CloseChatWindow(ip) => {
+                &chat_windows.remove(&ip);
+            }
+            UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet, received_files} => {
+                //println!("{}", ip.clone());
+                match &chat_windows.get(&ip) {
+                    Some(win) => {
+                        //&window.set_focus(Some(v_box));
+                        //win.win.show();
+                    }
+                    None => {
+                        let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone(),  received_files);
+                        &chat_windows.insert(ip.clone(), chat_win);
+                    }
+                }
+            }
+            UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files} => {
+                match &chat_windows.get(&to_ip) {
+                    Some(win) => {
+                        let (his_start_iter, mut his_end_iter) = win.his_view.get_buffer().unwrap().get_bounds();
+                        win.his_view.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
+                    }
+                    None => {}
+                }
+            }
+            UiEvent::DisplayReceivedMsgInHis{ from_ip, name, context, files } => {
+                match &chat_windows.get(&from_ip) {
+                    Some(win) => {
+                        let (his_start_iter, mut his_end_iter) = win.his_view.get_buffer().unwrap().get_bounds();
+                        win.his_view.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", name, context).as_str());
+                    }
+                    None => {}
+                }
             }
             _ => {
                 println!("{}", "aaa");
@@ -233,11 +309,5 @@ fn append_column(tree: &TreeView, id: i32, title: &str) {
 fn create_and_fill_model() -> ListStore {
     // Creation of a model with two rows.
     let model = ListStore::new(&[String::static_type(), String::static_type(), String::static_type(), String::static_type()]);
-
-    // Filling up the tree view.
-    /*let entries = &[("啦啦啦", "11"), ("啦啦啦", "22"), ("啦啦啦", "33"), ("啦啦啦", "44"), ("啦啦啦", "55"), ("啦啦啦", "66"), ("啦啦啦", "77"), ("啦啦啦", "88")];
-    for (i, entry) in entries.iter().enumerate() {
-        model.insert_with_values(None, &[0, 1, 2], &[&(i as u32 + 1), &entry.0, &entry.1]);
-    }*/
     model
 }

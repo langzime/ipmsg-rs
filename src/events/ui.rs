@@ -1,7 +1,15 @@
-
+use crate::model::{User, ReceivedPacketInner, Packet, ReceivedSimpleFileInfo, FileInfo};
 
 pub enum UiEvent {
-    AddEntry(String),
-    ShowEntry(usize),
-    UpdateUserListFooterStatus(String)
+    UpdateUserListFooterStatus(String),//create_or_open_chat
+    OpenOrReOpenChatWindow {
+        name: String,
+        ip: String
+    },
+    UserListRemoveOne(String),
+    UserListAddOne(User),
+    CloseChatWindow(String),
+    OpenOrReOpenChatWindow1 { name: String, ip: String, packet: Option<Packet>, received_files: Option<Vec<ReceivedSimpleFileInfo>>},
+    DisplaySelfSendMsgInHis{to_ip: String, context: String, files: Vec<FileInfo>},
+    DisplayReceivedMsgInHis{from_ip: String, name: String, context: String, files: Vec<FileInfo> }
 }

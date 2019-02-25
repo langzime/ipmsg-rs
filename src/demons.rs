@@ -29,9 +29,10 @@ use crate::message;
 use crate::util;
 use crate::chat_window::{self, ChatWindow};
 use crate::app::{self, GLOBAL_UDPSOCKET, GLOBAL_SHARELIST, GLOBAL_CHATWINDOWS, GLOBAL_USERLIST};
+use crate::events::{ui::UiEvent, model::ModelEvent};
 
 ///启动消息监听线程
-pub fn start_daemon(sender: mpsc::Sender<Packet>){
+pub fn start_daemon(sender: crossbeam_channel::Sender<ModelEvent>){
     crate::demons::GLOBAL_UDPSOCKET.with(|global| {
         if let Some(ref socket) = *global.borrow() {
             let socket_clone = socket.try_clone().unwrap();
@@ -57,7 +58,8 @@ pub fn start_daemon(sender: mpsc::Sender<Packet>){
                                     packet.additional_section = Some(String::from(v[5]));
                                 }
                                 packet.ip = src.ip().to_string();
-                                sender.send(packet);
+                                //sender.send(packet);
+                                sender.send(ModelEvent::ReceivedPacket {packet}).unwrap();
                             }else {
                                 println!("Invalid packet {} !", receive_str);
                             }
@@ -172,7 +174,7 @@ pub fn start_message_processer(receiver :mpsc::Receiver<Packet>, sender :mpsc::S
                         let packet_clone = packet.clone();
                         let received_packet_inner = ReceivedPacketInner::new((&packet).ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
                         remained_sender.send(received_packet_inner);
-                        ::glib::idle_add(create_or_open_chat);
+                        //::glib::idle_add(create_or_open_chat);
                     }else if cmd == constant::IPMSG_NOOPERATION {
                         info!("i am IPMSG_NOOPERATION");
                     }else if cmd == constant::IPMSG_BR_ABSENCE {
@@ -385,8 +387,8 @@ pub fn create_or_open_chat() -> ::glib::Continue {
                     }else {
                         let ip_str1 = host_ip.clone();
                         let ip_str2 = host_ip.clone();
-                        let chat_win = chat_window::create_chat_window(name, ip_str1, packet, received_files);
-                        map.insert(ip_str2, chat_win);
+                        //let chat_win = chat_window::create_chat_window(name, ip_str1, packet, received_files);
+                        //map.insert(ip_str2, chat_win);
                     }
                 }
             }

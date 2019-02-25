@@ -13,6 +13,7 @@ use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use crate::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
+use crate::events::model::ModelEvent;
 use crate::message;
 use crate::constant;
 use crate::app::GLOBAL_CHATWINDOWS;
@@ -45,7 +46,7 @@ pub struct ChatWindow {
     pub received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>>
 }
 
-pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<Packet>, received_files: Option<Vec<ReceivedSimpleFileInfo>>) -> ChatWindow {
+pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Sender<ModelEvent>, name :S, host_ip :S, received_files: Option<Vec<ReceivedSimpleFileInfo>>) -> ChatWindow {
     let name: String = name.into();
     let host_ip: String = host_ip.into();
     let ip_str = host_ip.clone();
@@ -62,21 +63,20 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let chat_window: Window = builder.get_object("chat_window").unwrap();
     chat_window.set_title(chat_title);
     chat_window.set_border_width(5);
+    //历史
     let text_view_history: TextView = builder.get_object("text_view_history").unwrap();
+    //待发送的
     let text_view_presend: TextView = builder.get_object("text_view_presend").unwrap();
-    let tree_view_presend: TreeView = builder.get_object("tree_view_presend").unwrap();//tree_view_received
+    //待发送文件
+    let tree_view_presend: TreeView = builder.get_object("tree_view_presend").unwrap();
+    //接受的文件
     let tree_view_received: TreeView = builder.get_object("tree_view_received").unwrap();
+
     text_view_history.set_wrap_mode(WrapMode::WordChar);
     text_view_presend.set_wrap_mode(WrapMode::WordChar);
     append_column(&tree_view_presend, 0, "待发送文件");
     append_column(&tree_view_received, 0, "收到的文件");
 
-
-    if let Some(pac) = packet {
-        let additional_section =  pac.additional_section.unwrap();
-        let v: Vec<&str> = additional_section.split('\0').into_iter().collect();
-        &text_view_history.get_buffer().unwrap().set_text(format!("{}:{}\n", name, v[0]).as_str());
-    }
     let btn_clear: Button = builder.get_object("btn_clear").unwrap();
     let btn_send: Button = builder.get_object("btn_send").unwrap();//btn_file
     let btn_file: Button = builder.get_object("btn_file").unwrap();
@@ -88,25 +88,24 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
     let pre_send_files: Arc<RefCell<Vec<model::FileInfo>>> = Arc::new(RefCell::new(Vec::new()));//待发送文件列表
     let pre_send_files_model = create_and_fill_model();
     let pre_send_files_model_send = pre_send_files_model.clone();
-    tree_view_presend.set_model(Some(&pre_send_files_model_send));
+    //tree_view_presend.set_model(Some(&pre_send_files_model_send));
     let pre_received_files_model = create_and_fill_model1();
     let pre_send_files_model_clone = pre_received_files_model.clone();
     tree_view_received.set_model(Some(&pre_send_files_model_clone));
     let files_send_clone = pre_send_files.clone();
-    btn_send.connect_clicked(move|_|{
+    btn_send.connect_clicked(clone!(model_sender => move|_|{
         let (start_iter, mut end_iter) = text_view_presend_clone.get_buffer().unwrap().get_bounds();
         let context :&str = &text_view_presend_clone.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
-        message::send_ipmsg(context.to_owned(), files_send_clone.clone(), ip_str2.clone());
+        let packet = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), ip_str2.clone());
+        model_sender.send(ModelEvent::SendOneMsg {to_ip: ip_str2.clone(), packet, context: context.to_owned(), files: files_send_clone.clone().borrow().to_vec()}).unwrap();
         (*files_send_clone.borrow_mut()).clear();
         pre_send_files_model_send.clear();
-        let (his_start_iter, mut his_end_iter) = text_view_history_clone.get_buffer().unwrap().get_bounds();
-        &text_view_history_clone.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
         &text_view_presend_clone.get_buffer().unwrap().set_text("");
-    });
+    }));
 
     let chat_window_open_save = chat_window.clone();
     //let pre_send_files_model_clone1 = pre_received_files_model.clone();
-    tree_view_received.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
+    /*tree_view_received.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
             let name = model.get_value(&iter, 0).get().unwrap();
@@ -140,7 +139,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
             }
             file_chooser.destroy();
         }
-    });
+    });*/
 
     let text_view_presend_clone = text_view_presend.clone();
     btn_clear.connect_clicked(move|_|{
@@ -235,12 +234,9 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S, packet: Option<P
         file_chooser.destroy();
     });
 
-    chat_window.connect_delete_event(clone!(ip_str => move|_, _| {
-        GLOBAL_CHATWINDOWS.with(|global| {
-            if let Some((ref mut map1, _)) = *global.borrow_mut() {
-                map1.remove(&ip_str);
-            }
-        });
+
+    chat_window.connect_delete_event(clone!(model_sender, ip_str => move|_, _| {
+        model_sender.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: ip_str.clone()}).unwrap();
         Inhibit(false)
     }));
 

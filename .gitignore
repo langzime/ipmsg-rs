@@ -1,5 +1,5 @@
-# Created by .ignore support plugin (hsz.mobi)
-*.iml
-**/target/
-.idea
+target/
+**/*.rs.bk
+.gitignore
+.idea/
 .DS_Store
