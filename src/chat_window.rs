@@ -33,11 +33,6 @@ pub struct ChatWindow {
 pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Sender<ModelEvent>, name :S, host_ip :S) -> ChatWindow {
     let name: String = name.into();
     let host_ip: String = host_ip.into();
-    let ip_str = host_ip.clone();
-    let ip_str2 = host_ip.clone();
-    let ip_str3 = host_ip.clone();
-    let ip_str4 = host_ip.clone();
-    let ip_str5 = host_ip.clone();
     let chat_title = &format!("和{}({})聊天窗口", name, host_ip);
 
     let glade_src = include_str!("chat_window.glade");
@@ -76,11 +71,11 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     let pre_received_files_model = create_and_fill_model1();
     tree_view_received.set_model(Some(&pre_received_files_model));
     let files_send_clone = pre_send_files.clone();
-    btn_send.connect_clicked(clone!(model_sender, pre_send_files_model => move|_|{
+    btn_send.connect_clicked(clone!(model_sender, pre_send_files_model, host_ip => move|_|{
         let (start_iter, mut end_iter) = text_view_presend_clone.get_buffer().unwrap().get_bounds();
         let context :&str = &text_view_presend_clone.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
-        let packet = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), ip_str2.clone());
-        model_sender.send(ModelEvent::SendOneMsg {to_ip: ip_str2.clone(), packet, context: context.to_owned(), files: files_send_clone.clone().borrow().to_vec()}).unwrap();
+        let packet = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), host_ip.clone());
+        model_sender.send(ModelEvent::SendOneMsg {to_ip: host_ip.clone(), packet, context: context.to_owned(), files: files_send_clone.clone().borrow().to_vec()}).unwrap();
         (*files_send_clone.borrow_mut()).clear();
         pre_send_files_model.clear();
         &text_view_presend_clone.get_buffer().unwrap().set_text("");
@@ -218,15 +213,15 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     }));
 
 
-    chat_window.connect_delete_event(clone!(model_sender, ip_str => move|_, _| {
-        model_sender.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: ip_str.clone()}).unwrap();
+    chat_window.connect_delete_event(clone!(model_sender, host_ip => move|_, _| {
+        model_sender.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: host_ip.clone()}).unwrap();
         Inhibit(false)
     }));
 
     chat_window.show_all();
     let clone_chat = chat_window.clone();
     let clone_hist_view = text_view_history.clone();
-    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files, received_store: pre_received_files_model}
+    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: host_ip, pre_send_files: pre_send_files, received_store: pre_received_files_model}
 }
 
 fn append_column(tree: &TreeView, id: i32, title: &str) {
