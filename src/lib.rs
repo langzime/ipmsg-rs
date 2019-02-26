@@ -14,7 +14,7 @@ extern crate encoding;
 //extern crate generator;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-extern crate env_logger;
+#[macro_use] extern crate env_logger;
 #[macro_use] extern crate quick_error;
 
 
@@ -22,6 +22,8 @@ mod constant;
 mod model;
 mod demons;
 mod message;
+
+#[macro_use]
 mod util;
 mod chat_window;
 mod download;

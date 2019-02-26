@@ -23,24 +23,6 @@ use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, R
 use crate::chat_window::ChatWindow;
 use crate::events::{ui::UiEvent, model::ModelEvent, model::model_run};
 
-// make moving clones into closures more convenient
-macro_rules! clone {
-    (@param _) => ( _ );
-    (@param $x:ident) => ( $x );
-    ($($n:ident),+ => move || $body:expr) => (
-        {
-            $( let $n = $n.clone(); )+
-                move || $body
-        }
-    );
-    ($($n:ident),+ => move |$($p:tt),+| $body:expr) => (
-        {
-            $( let $n = $n.clone(); )+
-                move |$(clone!(@param $p),)+| $body
-        }
-    );
-}
-
 thread_local!(
     pub static GLOBAL_USERLIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
     pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);//udp全局变量
@@ -179,7 +161,7 @@ pub fn build_ui(application: &gtk::Application){
                         //win.win.show();
                     }
                     None => {
-                        let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone(), None);
+                        let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone());
                         &chat_windows.insert(ip.clone(), chat_win);
                     }
                 }
@@ -238,7 +220,7 @@ pub fn build_ui(application: &gtk::Application){
             UiEvent::CloseChatWindow(ip) => {
                 &chat_windows.remove(&ip);
             }
-            UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet, received_files} => {
+            UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet} => {
                 //println!("{}", ip.clone());
                 match &chat_windows.get(&ip) {
                     Some(win) => {
@@ -246,7 +228,7 @@ pub fn build_ui(application: &gtk::Application){
                         //win.win.show();
                     }
                     None => {
-                        let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone(),  received_files);
+                        let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone());
                         &chat_windows.insert(ip.clone(), chat_win);
                     }
                 }
@@ -256,6 +238,10 @@ pub fn build_ui(application: &gtk::Application){
                     Some(win) => {
                         let (his_start_iter, mut his_end_iter) = win.his_view.get_buffer().unwrap().get_bounds();
                         win.his_view.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
+
+                        /*for file in files {
+                            win.pre_send_files_model.insert_with_values(None, &[0, 1], &[&&file.name, &format!("{}", &file.file_id)]);
+                        }*/
                     }
                     None => {}
                 }
@@ -265,6 +251,11 @@ pub fn build_ui(application: &gtk::Application){
                     Some(win) => {
                         let (his_start_iter, mut his_end_iter) = win.his_view.get_buffer().unwrap().get_bounds();
                         win.his_view.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", name, context).as_str());
+
+                        for file in &files {
+                            info!("init {}  {}", file.packet_id, file.file_id);
+                            win.received_store.insert_with_values(None, &[0, 1, 2, 3], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr]);
+                        }
                     }
                     None => {}
                 }

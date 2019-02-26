@@ -125,14 +125,14 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                 ModelEvent::ReceivedMsg {msg} => {
                     let name = msg.clone().packet.unwrap().sender_name;
                     let ip = msg.clone().ip.clone();
-                    ui_event_sender.send(UiEvent::OpenOrReOpenChatWindow1 { name: name.clone(), ip: ip.clone(), packet: msg.clone().packet, received_files: msg.clone().opt_files}).unwrap();
+                    ui_event_sender.send(UiEvent::OpenOrReOpenChatWindow1 { name: name.clone(), ip: ip.clone(), packet: msg.clone().packet}).unwrap();
                     let additional_section =  msg.clone().packet.unwrap().additional_section.unwrap();
                     let v: Vec<&str> = additional_section.split('\0').into_iter().collect();
                     ui_event_sender.send(UiEvent::DisplayReceivedMsgInHis{
                         from_ip: ip.clone(),
                         name: name.clone(),
                         context: v[0].to_owned(),
-                        files: vec![]
+                        files: msg.opt_files.unwrap_or(vec![])
                     }).unwrap();
                 }
                 ModelEvent::SendOneMsg {to_ip, packet, context, files} => {

@@ -19,22 +19,7 @@ use crate::constant;
 use crate::app::GLOBAL_CHATWINDOWS;
 
 // make moving clones into closures more convenient
-macro_rules! clone {
-    (@param _) => ( _ );
-    (@param $x:ident) => ( $x );
-    ($($n:ident),+ => move || $body:expr) => (
-        {
-            $( let $n = $n.clone(); )+
-            move || $body
-        }
-    );
-    ($($n:ident),+ => move |$($p:tt),+| $body:expr) => (
-        {
-            $( let $n = $n.clone(); )+
-            move |$(clone!(@param $p),)+| $body
-        }
-    );
-}
+
 
 #[derive(Clone)]
 pub struct ChatWindow {
@@ -42,11 +27,10 @@ pub struct ChatWindow {
     pub his_view :TextView,
     pub ip :String,
     pub pre_send_files :Arc<RefCell<Vec<model::FileInfo>>>,
-    pub received_store :Option<ListStore>,
-    pub received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>>
+    pub received_store :ListStore,
 }
 
-pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Sender<ModelEvent>, name :S, host_ip :S, received_files: Option<Vec<ReceivedSimpleFileInfo>>) -> ChatWindow {
+pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Sender<ModelEvent>, name :S, host_ip :S) -> ChatWindow {
     let name: String = name.into();
     let host_ip: String = host_ip.into();
     let ip_str = host_ip.clone();
@@ -84,22 +68,21 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
 
     let text_view_presend_clone = text_view_presend.clone();
     let text_view_history_clone = text_view_history.clone();
-    let arc_received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>> = Arc::new(RefCell::new(Vec::new()));
+    //let arc_received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>> = Arc::new(RefCell::new(Vec::new()));
     let pre_send_files: Arc<RefCell<Vec<model::FileInfo>>> = Arc::new(RefCell::new(Vec::new()));//待发送文件列表
     let pre_send_files_model = create_and_fill_model();
-    let pre_send_files_model_send = pre_send_files_model.clone();
-    //tree_view_presend.set_model(Some(&pre_send_files_model_send));
+    tree_view_presend.set_model(Some(&pre_send_files_model));
+    //let pre_send_files_model_send = pre_send_files_model.clone();
     let pre_received_files_model = create_and_fill_model1();
-    let pre_send_files_model_clone = pre_received_files_model.clone();
-    tree_view_received.set_model(Some(&pre_send_files_model_clone));
+    tree_view_received.set_model(Some(&pre_received_files_model));
     let files_send_clone = pre_send_files.clone();
-    btn_send.connect_clicked(clone!(model_sender => move|_|{
+    btn_send.connect_clicked(clone!(model_sender, pre_send_files_model => move|_|{
         let (start_iter, mut end_iter) = text_view_presend_clone.get_buffer().unwrap().get_bounds();
         let context :&str = &text_view_presend_clone.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
         let packet = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), ip_str2.clone());
         model_sender.send(ModelEvent::SendOneMsg {to_ip: ip_str2.clone(), packet, context: context.to_owned(), files: files_send_clone.clone().borrow().to_vec()}).unwrap();
         (*files_send_clone.borrow_mut()).clear();
-        pre_send_files_model_send.clear();
+        pre_send_files_model.clear();
         &text_view_presend_clone.get_buffer().unwrap().set_text("");
     }));
 
@@ -148,9 +131,9 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
 
     let chat_window_open_file = chat_window.clone();
     let pre_send_files_open_file = pre_send_files.clone();
-    let pre_send_files_model_file = pre_send_files_model.clone();
+    //let pre_send_files_model_file = pre_send_files_model.clone();
 
-    btn_file.connect_clicked(move|_|{
+    btn_file.connect_clicked(clone!(pre_send_files_model => move|_|{
         let file_chooser = gtk::FileChooserDialog::new(
             Some("打开文件"), Some(&chat_window_open_file), gtk::FileChooserAction::Open);
         file_chooser.add_buttons(&[
@@ -185,16 +168,16 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             };
             let ref mut files_add = *pre_send_files_open_file.borrow_mut();
             files_add.push(file_info.clone());//添加待发送文件
-            pre_send_files_model_file.insert_with_values(None, &[0, 1], &[&&name, &format!("{}", &file_info.file_id)]);
+            pre_send_files_model.insert_with_values(None, &[0, 1], &[&&name, &format!("{}", &file_info.file_id)]);
         }
         file_chooser.destroy();
-    });
+    }));
 
     let chat_window_open_dir = chat_window.clone();
     let pre_send_files_open_dir = pre_send_files.clone();
-    let pre_send_files_model_dir = pre_send_files_model.clone();
+    //let pre_send_files_model_dir = pre_send_files_model.clone();
 
-    btn_dir.connect_clicked(move|_|{
+    btn_dir.connect_clicked(clone!(pre_send_files_model => move|_|{
         let file_chooser = gtk::FileChooserDialog::new(
             Some("打开文件夹"), Some(&chat_window_open_dir), gtk::FileChooserAction::SelectFolder);
         file_chooser.add_buttons(&[
@@ -229,10 +212,10 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             };
             let ref mut files_add = *pre_send_files_open_dir.borrow_mut();
             files_add.push(file_info.clone());//添加待发送文件
-            pre_send_files_model_dir.insert_with_values(None, &[0, 1], &[&name, &format!("{}", &file_info.file_id)]);
+            pre_send_files_model.insert_with_values(None, &[0, 1], &[&name, &format!("{}", &file_info.file_id)]);
         }
         file_chooser.destroy();
-    });
+    }));
 
 
     chat_window.connect_delete_event(clone!(model_sender, ip_str => move|_, _| {
@@ -240,19 +223,10 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
         Inhibit(false)
     }));
 
-    let arc_received_files_clone = arc_received_files.clone();
-    if let Some(received_files) = received_files.clone() {
-        for file in &received_files {
-            info!("init {}  {}", file.packet_id, file.file_id);
-            pre_received_files_model.insert_with_values(None, &[0, 1, 2, 3], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr]);
-        }
-        *arc_received_files_clone.borrow_mut() = received_files;
-    }
-
     chat_window.show_all();
     let clone_chat = chat_window.clone();
     let clone_hist_view = text_view_history.clone();
-    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files, received_store: Some(pre_send_files_model_clone), received_files: arc_received_files}
+    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: ip_str, pre_send_files: pre_send_files, received_store: pre_received_files_model}
 }
 
 fn append_column(tree: &TreeView, id: i32, title: &str) {

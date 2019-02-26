@@ -9,7 +9,7 @@ pub enum UiEvent {
     UserListRemoveOne(String),
     UserListAddOne(User),
     CloseChatWindow(String),
-    OpenOrReOpenChatWindow1 { name: String, ip: String, packet: Option<Packet>, received_files: Option<Vec<ReceivedSimpleFileInfo>>},
+    OpenOrReOpenChatWindow1 { name: String, ip: String, packet: Option<Packet>},
     DisplaySelfSendMsgInHis{to_ip: String, context: String, files: Vec<FileInfo>},
-    DisplayReceivedMsgInHis{from_ip: String, name: String, context: String, files: Vec<FileInfo> }
+    DisplayReceivedMsgInHis{from_ip: String, name: String, context: String, files: Vec<ReceivedSimpleFileInfo> }
 }

@@ -331,7 +331,7 @@ pub fn make_header(path: &PathBuf) -> String {
     header
 }
 
-pub fn create_or_open_chat() -> ::glib::Continue {
+/*pub fn create_or_open_chat() -> ::glib::Continue {
     GLOBAL_CHATWINDOWS.with(|global| {
         if let Some((ref mut map, ref rx)) = *global.borrow_mut() {
             if let Ok(receivedPacketInner) = rx.try_recv() {
@@ -395,11 +395,11 @@ pub fn create_or_open_chat() -> ::glib::Continue {
         }
     });
     ::glib::Continue(false)
-}
+}*/
 
 ///
 ///
-pub fn remove_downloaded_file(host_ip: &str, pid: u32, fid: u32) -> ::glib::Continue {
+/*pub fn remove_downloaded_file(host_ip: &str, pid: u32, fid: u32) -> ::glib::Continue {
     GLOBAL_CHATWINDOWS.with(|global| {
         if let Some((ref mut map, _)) = *global.borrow_mut() {
             let select_map = map.clone();
@@ -438,7 +438,7 @@ pub fn remove_downloaded_file(host_ip: &str, pid: u32, fid: u32) -> ::glib::Cont
         }
     });
     ::glib::Continue(false)
-}
+}*/
 
 fn receive() -> ::glib::Continue {
     GLOBAL_USERLIST.with(|global| {
