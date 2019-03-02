@@ -221,7 +221,6 @@ pub fn build_ui(application: &gtk::Application){
                 &chat_windows.remove(&ip);
             }
             UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet} => {
-                //println!("{}", ip.clone());
                 match &chat_windows.get(&ip) {
                     Some(win) => {
                         //&window.set_focus(Some(v_box));
@@ -239,9 +238,6 @@ pub fn build_ui(application: &gtk::Application){
                         let (his_start_iter, mut his_end_iter) = win.his_view.get_buffer().unwrap().get_bounds();
                         win.his_view.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
 
-                        /*for file in files {
-                            win.pre_send_files_model.insert_with_values(None, &[0, 1], &[&&file.name, &format!("{}", &file.file_id)]);
-                        }*/
                     }
                     None => {}
                 }
@@ -255,6 +251,36 @@ pub fn build_ui(application: &gtk::Application){
                         for file in &files {
                             info!("init {}  {}", file.packet_id, file.file_id);
                             win.received_store.insert_with_values(None, &[0, 1, 2, 3], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr]);
+                        }
+                    }
+                    None => {}
+                }
+            }
+            UiEvent::RemoveInReceivedList{packet_id, file_id, download_ip } => {
+                match &chat_windows.get(&download_ip) {
+                    Some(win) => {
+                        let pre_receive_file_store = &win.received_store;
+                        if let Some(first) = pre_receive_file_store.get_iter_first(){
+                            let mut num :u32 = pre_receive_file_store.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                            let received_file_id = pre_receive_file_store.get_value(&first, 1).get::<u32>().unwrap();
+                            let received_packet_id = pre_receive_file_store.get_value(&first, 2).get::<u32>().unwrap();
+                            if file_id == received_file_id&&packet_id == received_packet_id {
+                                pre_receive_file_store.remove(&first);
+                            }else {
+                                loop {
+                                    num = num + 1;
+                                    if let Some(next_iter) = pre_receive_file_store.get_iter_from_string(&num.to_string()){
+                                        let next_file_id = pre_receive_file_store.get_value(&next_iter, 1).get::<u32>().unwrap();
+                                        let next_packet_id = pre_receive_file_store.get_value(&next_iter, 2).get::<u32>().unwrap();
+                                        if next_file_id == file_id&&next_packet_id == packet_id {
+                                            pre_receive_file_store.remove(&next_iter);
+                                            break;
+                                        }
+                                    }else{
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                     None => {}

@@ -7,10 +7,14 @@ use std::fmt::{self, Display};
 use std::error::Error;
 use std::fs::{self, File, Metadata, ReadDir};
 use std::net::ToSocketAddrs;
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use crate::constant::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT};
+use crate::events::model::ModelEvent;
 use crate::model::Packet;
+use crate::model::{FileInfo, ReceivedSimpleFileInfo};
 
 #[derive(Debug)]
 pub enum DownLoadError {
@@ -43,6 +47,66 @@ impl Error for DownLoadError {
             DownLoadError::ReaDelimiterErr => None
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct ManagerPool {
+    pub file_pool: Arc<Mutex<HashMap<u32, PoolFile>>>,
+    pub model_sender: crossbeam_channel::Sender<ModelEvent>
+}
+
+impl ManagerPool {
+
+    pub fn new(file_pool: Arc<Mutex<HashMap< u32, PoolFile>>>, model_event_sender: crossbeam_channel::Sender<ModelEvent>) -> ManagerPool {
+        ManagerPool { file_pool, model_sender: model_event_sender }
+    }
+
+    pub fn run(mut self, file_info: ReceivedSimpleFileInfo, save_path: PathBuf, download_ip: String) {
+        let p1 = self.clone();
+        {
+            let mut lock = p1.file_pool.lock().unwrap();
+            let sender = p1.model_sender;
+            let file = (*lock).get(&file_info.file_id);
+            if let Some(p_file) = file {
+                if p_file.status == 1 {
+                    //下载中
+                    sender.send(ModelEvent::DownloadIsBusy{ file: file_info });
+                    return;
+                }
+            }else {
+                (*lock).insert(file_info.file_id, PoolFile { status: 1, file_info: file_info.clone() });
+            }
+        }
+        let p2 = self.clone();
+        thread::spawn(move || {
+            let download_url = format!("{}:{}", download_ip, constant::IPMSG_DEFAULT_PORT);
+            let is_ok = download(download_url, save_path, file_info.packet_id, file_info.file_id, file_info.clone().name, file_info.clone().attr as u32).is_ok();
+            {
+                let sender = p2.model_sender;
+                let mut lock = p2.file_pool.lock().unwrap();
+                let mut file = (*lock).get(&file_info.file_id);
+                if let Some(p_file) = file.take() {
+                    if is_ok {
+                        (*lock).remove(&file_info.file_id);
+                        sender.send(ModelEvent::RemoveDownloadTaskInPool{ packet_id: file_info.packet_id, file_id: file_info.file_id, download_ip });
+                    }else{
+                        let mut tmp_file = p_file.clone();
+                        tmp_file.status = 0;
+                        (*lock).insert(tmp_file.file_info.file_id, tmp_file);
+                    }
+
+                }
+            }
+
+        });
+    }
+
+}
+
+#[derive(Clone, Debug)]
+pub struct PoolFile {
+    pub status: u8, //0 初始 1 下载中
+    pub file_info: ReceivedSimpleFileInfo,
 }
 
 impl From<io::Error> for DownLoadError {
@@ -113,7 +177,7 @@ impl Iterator for PathInfos {
                     if cmd == IPMSG_FILE_DIR {
                         next_path.push(file_name);
                         if !next_path.exists() {
-                            fs::create_dir(&next_path);
+                            fs::create_dir(&next_path).unwrap();
                         }
                         info!("crate dir{:?}", next_path);
                     }else if cmd == IPMSG_FILE_REGULAR {

@@ -218,7 +218,6 @@ pub struct ReceivedSimpleFileInfo {
     pub packet_id: u32,
     pub name: String,
     pub attr: u8,// 1 普通文件 2 文件夹
-    pub is_active: u8, // 0 pre, 1 ing, 2 finish
 }
 
 #[derive(Clone, Debug)]

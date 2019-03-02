@@ -61,7 +61,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     let btn_file: Button = builder.get_object("btn_file").unwrap();
     let btn_dir: Button = builder.get_object("btn_dir").unwrap();
 
-    let text_view_presend_clone = text_view_presend.clone();
+    //let text_view_presend_clone = text_view_presend.clone();
     let text_view_history_clone = text_view_history.clone();
     //let arc_received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>> = Arc::new(RefCell::new(Vec::new()));
     let pre_send_files: Arc<RefCell<Vec<model::FileInfo>>> = Arc::new(RefCell::new(Vec::new()));//待发送文件列表
@@ -71,22 +71,22 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     let pre_received_files_model = create_and_fill_model1();
     tree_view_received.set_model(Some(&pre_received_files_model));
     let files_send_clone = pre_send_files.clone();
-    btn_send.connect_clicked(clone!(model_sender, pre_send_files_model, host_ip => move|_|{
-        let (start_iter, mut end_iter) = text_view_presend_clone.get_buffer().unwrap().get_bounds();
-        let context :&str = &text_view_presend_clone.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
-        let packet = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), host_ip.clone());
-        model_sender.send(ModelEvent::SendOneMsg {to_ip: host_ip.clone(), packet, context: context.to_owned(), files: files_send_clone.clone().borrow().to_vec()}).unwrap();
+    btn_send.connect_clicked(clone!(model_sender, pre_send_files_model, host_ip, text_view_presend => move|_|{
+        let (start_iter, mut end_iter) = text_view_presend.get_buffer().unwrap().get_bounds();
+        let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
+        let (packet, share_file) = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), host_ip.clone());
+        model_sender.send(ModelEvent::SendOneMsg {to_ip: host_ip.clone(), packet, context: context.to_owned(), files: share_file}).unwrap();
         (*files_send_clone.borrow_mut()).clear();
         pre_send_files_model.clear();
-        &text_view_presend_clone.get_buffer().unwrap().set_text("");
+        &text_view_presend.get_buffer().unwrap().set_text("");
     }));
 
     let chat_window_open_save = chat_window.clone();
-    //let pre_send_files_model_clone1 = pre_received_files_model.clone();
-    /*tree_view_received.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
+
+    tree_view_received.connect_row_activated(clone!(model_sender, host_ip => move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
-            let name = model.get_value(&iter, 0).get().unwrap();
+            let name: String = model.get_value(&iter, 0).get().unwrap();
             let fid: u32 = model.get_value(&iter, 1).get().unwrap();
             let pid: u32 = model.get_value(&iter, 2).get().unwrap();
             let file_type: u8 = model.get_value(&iter, 3).get().unwrap();
@@ -97,36 +97,25 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                 ("取消", gtk::ResponseType::Cancel.into()),
             ]);
             if file_chooser.run() == gtk::ResponseType::Ok.into() {
-                let base_filename: PathBuf = file_chooser.get_filename().unwrap();
-                let base_filename_clone = base_filename.clone();
-                let target_ip = format!("{}:{}", ip_str4, constant::IPMSG_DEFAULT_PORT);
-                info!("choosed {:?} {:?} {:?} {:?} {:?}", name, fid, pid, base_filename.clone(), file_type);
-                let p1 = pid.clone();
-                let f1 = fid.clone();
-                let p2 = pid.clone();
-                let f2 = fid.clone();
-                let in_ip = ip_str5.clone();
-                thread::spawn(move|| {
-                    if let Ok(_) = crate::download::download(target_ip, base_filename_clone, p1, f1, name, file_type as u32) {
-                        //::成功删除
-                        ::glib::idle_add(move || crate::demons::remove_downloaded_file(&in_ip, p2, f2));
-                    }else {
-                        error!("download error!!");
-                    }
-                });
+                let save_base_path: PathBuf = file_chooser.get_filename().unwrap();
+                info!("choosed {:?} {:?} {:?} {:?} {:?}", name, fid, pid, save_base_path, file_type);
+                model_sender.send(ModelEvent::PutDownloadTaskInPool{ file: ReceivedSimpleFileInfo{
+                    file_id: fid,
+                    packet_id: pid,
+                    name: name,
+                    attr: file_type
+                }, save_base_path, download_ip: host_ip.clone() });
             }
             file_chooser.destroy();
         }
-    });*/
+    }));
 
-    let text_view_presend_clone = text_view_presend.clone();
-    btn_clear.connect_clicked(move|_|{
-        &text_view_presend_clone.get_buffer().unwrap().set_text("");
-    });
+    btn_clear.connect_clicked(clone!(text_view_presend => move|_|{
+        &text_view_presend.get_buffer().unwrap().set_text("");
+    }));
 
     let chat_window_open_file = chat_window.clone();
     let pre_send_files_open_file = pre_send_files.clone();
-    //let pre_send_files_model_file = pre_send_files_model.clone();
 
     btn_file.connect_clicked(clone!(pre_send_files_model => move|_|{
         let file_chooser = gtk::FileChooserDialog::new(
@@ -170,7 +159,6 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
 
     let chat_window_open_dir = chat_window.clone();
     let pre_send_files_open_dir = pre_send_files.clone();
-    //let pre_send_files_model_dir = pre_send_files_model.clone();
 
     btn_dir.connect_clicked(clone!(pre_send_files_model => move|_|{
         let file_chooser = gtk::FileChooserDialog::new(

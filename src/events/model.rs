@@ -1,9 +1,14 @@
 use std::thread;
+use std::sync::{Arc, Mutex};
 use std::net::UdpSocket;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use chrono::prelude::*;
-use crate::model::{Packet, User, ReceivedSimpleFileInfo, ReceivedPacketInner, FileInfo};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use crate::model::{Packet, User, ReceivedSimpleFileInfo, ReceivedPacketInner, FileInfo, ShareInfo};
+use crate::download::{PoolFile, ManagerPool};
+use crate::fileserver::FileServer;
 use crate::events::ui::UiEvent;
 use crate::constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_LIMITED_BROADCAST};
 
@@ -25,15 +30,28 @@ pub enum ModelEvent {
     ClickChatWindowCloseBtn{from_ip: String},
     NotifyOnline{ user: User},
     ReceivedMsg{msg: ReceivedPacketInner},
-    SendOneMsg {to_ip: String, packet: Packet, context: String, files: Vec<FileInfo>},
+    SendOneMsg {to_ip: String, packet: Packet, context: String, files: Option<ShareInfo>},
     PutInTcpFilePool(),
+    DownloadIsBusy { file: ReceivedSimpleFileInfo },
+    PutDownloadTaskInPool { file: ReceivedSimpleFileInfo, save_base_path: PathBuf, download_ip: String},
+    RemoveDownloadTaskInPool { packet_id: u32, file_id: u32, download_ip: String},
 }
 
 pub fn model_run(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelEvent>, model_event_sender: crossbeam_channel::Sender<ModelEvent>, ui_event_sender: glib::Sender<UiEvent>) {
 
-    start_daemon(socket.try_clone().unwrap(), model_event_sender.clone());
+    let file_pool: Arc<Mutex<Vec<ShareInfo>>> = Arc::new(Mutex::new(Vec::new()));
 
-    model_event_loop(socket.try_clone().unwrap(), receiver, model_event_sender.clone(), ui_event_sender);
+    let file_server = FileServer::new(file_pool.clone());
+
+    file_server.run();
+
+    let download_pool: Arc<Mutex<HashMap<u32, PoolFile>>> = Arc::new(Mutex::new(HashMap::new()));
+
+    let manager_pool = ManagerPool::new(download_pool, model_event_sender.clone());
+
+    model_event_loop(socket.try_clone().unwrap(), receiver, model_event_sender.clone(), ui_event_sender, file_server, manager_pool);
+
+    start_daemon(socket.try_clone().unwrap(), model_event_sender.clone());
 
     send_ipmsg_br_entry(model_event_sender.clone());
 }
@@ -81,7 +99,7 @@ pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEv
     });
 }
 
-fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelEvent>, model_event_sender: crossbeam_channel::Sender<ModelEvent>, ui_event_sender: glib::Sender<UiEvent>) {
+fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelEvent>, model_event_sender: crossbeam_channel::Sender<ModelEvent>, ui_event_sender: glib::Sender<UiEvent>, file_server: FileServer, manager_pool: ManagerPool) {
     let socket_clone = socket.try_clone().unwrap();
     thread::spawn(move || {
         while let Ok(ev) = receiver.recv() {
@@ -139,7 +157,27 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                     let addr:String = format!("{}:{}", to_ip, constant::IPMSG_DEFAULT_PORT);
                     socket_clone.set_broadcast(false).unwrap();
                     socket_clone.send_to(crate::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str()).expect("couldn't send message");
-                    ui_event_sender.send(UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files}).unwrap();
+                    ui_event_sender.send(UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files: files.clone()}).unwrap();
+                    {
+                        let mut file_pool = file_server.file_pool.lock().unwrap();
+                        if let Some(file) = files {
+                            (*file_pool).push(file);
+                        }
+
+                    }
+                }
+                ModelEvent::DownloadIsBusy{ file } => {
+                    info!("{} is downloading!!!", file.name);
+                }
+                ModelEvent::PutDownloadTaskInPool {file, save_base_path, download_ip} => {
+                    manager_pool.clone().run(file, save_base_path, download_ip);
+                }
+                ModelEvent::RemoveDownloadTaskInPool {packet_id, file_id, download_ip } => {
+                    ui_event_sender.send(UiEvent::RemoveInReceivedList{
+                        packet_id,
+                        file_id,
+                        download_ip
+                    }).unwrap();
                 }
                 _ => {
                     println!("{}", "aa");
@@ -226,7 +264,6 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
                             packet_id: (&packet).packet_no.parse::<u32>().unwrap(),
                             name: file_name.to_owned(),
                             attr: file_attr as u8,
-                            is_active: 0,
                         };
                         simple_file_infos.push(simple_file_info);
                     }
