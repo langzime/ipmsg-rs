@@ -186,8 +186,8 @@ impl Iterator for PathInfos {
                         read_bytes_to_file(stream, file_size, &next_path);
                         next_path.pop();
                     }else if cmd == IPMSG_FILE_RETPARENT  {
-                        info!("back to parent");
                         next_path.pop();
+                        info!("back to parent {:?}", next_path);
                     }else {
 
                     }
@@ -229,7 +229,6 @@ fn read_bytes_to_file(mut stream : & mut BufReader<TcpStream>, len: u64, file_pa
     let mut handler = stream.take(len as u64);
     let mut buf = [0; 1024 * 4];
     while let Ok(bytes_read) = handler.read(&mut buf) {
-        info!("file in ...");
         if bytes_read == 0 { break; }
         f.write(&buf[..bytes_read]);
     }
