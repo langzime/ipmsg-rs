@@ -8,6 +8,7 @@ use std::fs::{self, File, Metadata, ReadDir};
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use chrono::prelude::*;
+use log::{info, trace, warn, debug};
 use crate::model::{FileInfo, Packet, ShareInfo};
 use crate::{constant, util};
 

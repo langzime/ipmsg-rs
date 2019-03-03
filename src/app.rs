@@ -18,18 +18,10 @@ use gtk::{
 use gdk_pixbuf::Pixbuf;
 use glib::Receiver;
 use crossbeam_channel::unbounded;
-
+use log::{info, trace, warn, debug};
 use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner};
 use crate::chat_window::ChatWindow;
 use crate::events::{ui::UiEvent, model::ModelEvent, model::model_run};
-
-thread_local!(
-    pub static GLOBAL_USERLIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<OperUser>)>> = RefCell::new(None);//用户列表
-    pub static GLOBAL_UDPSOCKET: RefCell<Option<UdpSocket>> = RefCell::new(None);//udp全局变量
-    pub static GLOBAL_CHATWINDOWS: RefCell<Option<(HashMap<String, ChatWindow>, mpsc::Receiver<ReceivedPacketInner>)>> = RefCell::new(None);//聊天窗口列表
-    pub static GLOBAL_SHARELIST: RefCell<Option<Arc<Mutex<Vec<ShareInfo>>>>> = RefCell::new(Some(Arc::new(Mutex::new(Vec::new()))));//发送文件列表
-    pub static GLOBAL_RECEIVELIST: RefCell<Option<(::gtk::ListStore, mpsc::Receiver<ShareInfo>)>> = RefCell::new(None);//接收文件列表
-);
 
 pub fn run(){
     ::std::env::set_var("RUST_LOG", "debug");
@@ -46,7 +38,7 @@ pub fn run(){
 }
 
 pub fn build_ui(application: &gtk::Application){
-    drop(::env_logger::init().unwrap());
+    drop(env_logger::init());
     info!("starting up");
     if gtk::init().is_err() {
         info!("Failed to initialize GTK.");
@@ -118,11 +110,8 @@ pub fn build_ui(application: &gtk::Application){
         }
     }));
 
-    let (remained_sender, remained_receiver): (mpsc::Sender<ReceivedPacketInner>, mpsc::Receiver<ReceivedPacketInner>) = mpsc::channel();
-
     let mut chat_windows: HashMap<String, ChatWindow> = HashMap::new();
 
-    let remained_sender1 = remained_sender.clone();
     tree.connect_row_activated(clone!(model_sender => move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
@@ -140,13 +129,6 @@ pub fn build_ui(application: &gtk::Application){
         Err(e) => panic!("couldn't bind socket: {}", e)
     };
 
-    ///待处理消息队列
-    let (packet_sender, packet_receiver): (mpsc::Sender<Packet>, mpsc::Receiver<Packet>) = mpsc::channel();
-
-    GLOBAL_CHATWINDOWS.with(move |global| {
-        *global.borrow_mut() = Some((HashMap::new(), remained_receiver));
-    });
-
     //接收消息守护线程
     //crate::demons::start_file_processer();
     model_run(socket.try_clone().unwrap(), model_receiver, model_sender.clone(),tx);
@@ -154,11 +136,8 @@ pub fn build_ui(application: &gtk::Application){
     rx.attach(None, move |event| {
         match event {
             UiEvent::OpenOrReOpenChatWindow {name, ip} => {
-                println!("{} {}", name, ip.clone());
                 match &chat_windows.get(&ip) {
                     Some(win) => {
-                        //&window.set_focus(Some(v_box));
-                        //win.win.show();
                     }
                     None => {
                         let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone());
@@ -249,8 +228,7 @@ pub fn build_ui(application: &gtk::Application){
                         win.his_view.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", name, context).as_str());
 
                         for file in &files {
-                            info!("init {}  {}", file.packet_id, file.file_id);
-                            win.received_store.insert_with_values(None, &[0, 1, 2, 3], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr]);
+                            win.received_store.insert_with_values(None, &[0, 1, 2, 3, 4, 5], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr, &&file.size, &&file.mtime]);
                         }
                     }
                     None => {}

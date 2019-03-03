@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
+use log::{info, trace, warn, debug};
 use crate::constant::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT};
 use crate::events::model::ModelEvent;
 use crate::model::Packet;
@@ -80,7 +81,7 @@ impl ManagerPool {
         let p2 = self.clone();
         thread::spawn(move || {
             let download_url = format!("{}:{}", download_ip, constant::IPMSG_DEFAULT_PORT);
-            let is_ok = download(download_url, save_path, file_info.packet_id, file_info.file_id, file_info.clone().name, file_info.clone().attr as u32).is_ok();
+            let is_ok = download(download_url, save_path, file_info.clone()).is_ok();
             {
                 let sender = p2.model_sender;
                 let mut lock = p2.file_pool.lock().unwrap();
@@ -115,26 +116,22 @@ impl From<io::Error> for DownLoadError {
     }
 }
 
-pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, packet_id: u32, file_id: u32, name: String, file_type: u32) -> Result<(), DownLoadError> {
+pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, r_file: ReceivedSimpleFileInfo) -> Result<(), DownLoadError> {
     info!("start download file");
+    let file_type = r_file.attr as u32;
     let mut stream = TcpStream::connect(addr)?;
     let path: &Path = to_path.as_ref();
     let metadata: Metadata = fs::metadata(path)?;
-    let packet = Packet::new(IPMSG_SENDMSG| if file_type == IPMSG_FILE_DIR { IPMSG_GETDIRFILES } else { IPMSG_GETFILEDATA }, Some(format!("{:x}:{:x}:0:\u{0}", packet_id, file_id)));
+    let packet = Packet::new(IPMSG_SENDMSG| if file_type == IPMSG_FILE_DIR { IPMSG_GETDIRFILES } else { IPMSG_GETFILEDATA }, Some(format!("{:x}:{:x}:0:\u{0}", r_file.packet_id, r_file.file_id)));
     stream.write(packet.to_string().as_bytes())?;
     debug!("filetype {}", file_type);
     if file_type == IPMSG_FILE_REGULAR {
         let mut file_location = path.to_path_buf();
-        file_location.push(name);
-        let mut file = File::create(&file_location)?;
-        loop {
-            let mut buffer = [0; 2048];
-            let num = stream.read(&mut buffer[..])?;
-            if num == 0 {
-                break;
-            }
-            file.write(&buffer[0..num])?;
-        }
+        file_location.push(r_file.name);
+        //let mut file = File::create(&file_location)?;
+        let file_size = r_file.size;
+        let mut buffer = BufReader::new(stream);
+        read_bytes_to_file(&mut buffer, file_size, &file_location);
     }else if file_type == IPMSG_FILE_DIR {
         let mut base_file_location = path.to_path_buf();
         let mut buffer = BufReader::new(stream);
@@ -146,6 +143,7 @@ pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, packet_id
 
         }
     }
+    info!("download end!");
     Ok(())
 }
 
@@ -231,5 +229,20 @@ fn read_bytes_to_file(mut stream : & mut BufReader<TcpStream>, len: u64, file_pa
     while let Ok(bytes_read) = handler.read(&mut buf) {
         if bytes_read == 0 { break; }
         f.write(&buf[..bytes_read]);
+    }
+}
+
+///
+/// unkown filesize can use follow
+///
+fn read_bytes_to_file_unsize(mut stream : & mut BufReader<TcpStream>, len: u64, file_path: &PathBuf) {
+    let mut file: File = File::create(file_path).unwrap();
+    loop {
+        let mut buffer = [0; 2048];
+        let num = stream.read(&mut buffer[..]).unwrap();
+        if num == 0 {
+            break;
+        }
+        file.write(&buffer[0..num]).unwrap();
     }
 }

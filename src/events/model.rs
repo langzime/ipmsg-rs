@@ -6,6 +6,7 @@ use encoding::all::GB18030;
 use chrono::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use log::{info, trace, warn, debug, error};
 use crate::model::{Packet, User, ReceivedSimpleFileInfo, ReceivedPacketInner, FileInfo, ShareInfo};
 use crate::download::{PoolFile, ManagerPool};
 use crate::fileserver::FileServer;
@@ -13,16 +14,9 @@ use crate::events::ui::UiEvent;
 use crate::constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_LIMITED_BROADCAST};
 
 pub enum ModelEvent {
-    //Quit,
-    //SearchFor(String),
     UserListSelected(String),
-    UserListDoubleClicked{
-        name: String,
-        ip:String
-    },
-    ReceivedPacket{
-        packet: Packet
-    },
+    UserListDoubleClicked{ name: String, ip:String },
+    ReceivedPacket{ packet: Packet },
     BroadcastEntry(Packet),
     RecMsgReply{ packet: Packet, from_ip: String},
     BroadcastExit(String),
@@ -68,8 +62,7 @@ pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEv
             let mut buf = [0; 2048];
             match socket_clone.recv_from(&mut buf) {
                 Ok((amt, src)) => {
-                    //let receive_str = unsafe { str::from_utf8_unchecked(&buf[0..amt])};
-                    //todo 默认是用中文编码 还没想到怎么做兼容
+                    //todo 默认是用中文编码 可配置化
                     let receive_str = GB18030.decode(&buf[0..amt], DecoderTrap::Strict).unwrap();
                     info!("receive raw message -> {:?} from ip -> {:?}", receive_str, src.ip());
                     let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
@@ -85,14 +78,13 @@ pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEv
                             packet.additional_section = Some(String::from(v[5]));
                         }
                         packet.ip = src.ip().to_string();
-                        //sender.send(packet);
                         sender.send(ModelEvent::ReceivedPacket {packet}).unwrap();
                     }else {
-                        println!("Invalid packet {} !", receive_str);
+                        error!("Invalid packet {} !", receive_str);
                     }
                 },
                 Err(e) => {
-                    info!("couldn't recieve a datagram: {}", e);
+                    error!("couldn't recieve a datagram: {}", e);
                 }
             }
         }
@@ -116,7 +108,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                 ModelEvent::BroadcastEntry(packet) => {
                     socket_clone.set_broadcast(true).unwrap();
                     let addr:String = format!("{}:{}", IPMSG_LIMITED_BROADCAST, IPMSG_DEFAULT_PORT);
-                    socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str());
+                    socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
                 }
                 ModelEvent::RecMsgReply{packet, from_ip} => {
                     let addr:String = format!("{}:{}", from_ip, constant::IPMSG_DEFAULT_PORT);
@@ -195,9 +187,9 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
     }
     let opt = constant::get_opt((&packet).command_no);
     let cmd = constant::get_mode((&packet).command_no);
-    info!("{:?}", &packet);
-    info!("{:x}", &packet.packet_no.parse::<i32>().unwrap());
-    info!("cmd {:x} opt {:x} opt section {:?}", cmd, opt, extstr);
+    //info!("{:?}", &packet);
+    //info!("{:x}", &packet.packet_no.parse::<i32>().unwrap());
+    //info!("cmd {:x} opt {:x} opt section {:?}", cmd, opt, extstr);
     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
         let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some((&packet).packet_no.to_string()));
         model_event_sender.send(ModelEvent::RecMsgReply{packet: recvmsg, from_ip: (&packet).ip.to_owned()});
@@ -246,12 +238,14 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
                     if file_attr.len() >= 5 {
                         let file_id = file_attr[0].parse::<u32>().unwrap();
                         let file_name = file_attr[1];
-                        let size = file_attr[2];//大小
+                        let size = u64::from_str_radix(file_attr[2], 16).unwrap();//大小
                         let mmtime = file_attr[3];//修改时间
-                        let mmtime_num = i64::from_str_radix(mmtime, 16).unwrap();//时间戳
+                        let mut mmtime_num = i64::from_str_radix(mmtime, 16).unwrap();//时间戳
+                        if mmtime_num >= 10000000000 {
+                            mmtime_num = (mmtime_num as i64)/1000;
+                        }
                         let file_attr = file_attr[4].parse::<u32>().unwrap();//文件属性
-                        let ntime = NaiveDateTime::from_timestamp(mmtime_num as i64, 0);
-                        info!("{}", ntime.format("%Y-%m-%d %H:%M:%S").to_string());
+                        let ntime = NaiveDateTime::from_timestamp(mmtime_num, 0);
                         if file_attr == constant::IPMSG_FILE_REGULAR {
                             info!("i am ipmsg_file_regular");
                         }else if file_attr == constant::IPMSG_FILE_DIR {
@@ -260,10 +254,12 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
                             panic!("no no type")
                         }
                         let simple_file_info = ReceivedSimpleFileInfo {
-                            file_id: file_id,
+                            file_id,
                             packet_id: (&packet).packet_no.parse::<u32>().unwrap(),
                             name: file_name.to_owned(),
                             attr: file_attr as u8,
+                            size,
+                            mtime: mmtime_num
                         };
                         simple_file_infos.push(simple_file_info);
                     }
@@ -276,8 +272,6 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
         let packet_clone = packet.clone();
         let received_packet_inner = ReceivedPacketInner::new((&packet).ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
         model_event_sender.send(ModelEvent::ReceivedMsg {msg: received_packet_inner}).unwrap();
-        //remained_sender.send(received_packet_inner);
-        //::glib::idle_add(create_or_open_chat);
     }else if cmd == constant::IPMSG_NOOPERATION {
         info!("i am IPMSG_NOOPERATION");
     }else if cmd == constant::IPMSG_BR_ABSENCE {

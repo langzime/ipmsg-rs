@@ -141,10 +141,11 @@ pub fn get_opt(command: u32) -> u32 {
     command & 0xffffff00
 }
 
-extern crate hostname as host_name;
-extern crate local_ip;
+use ::hostname as host_name;
+use local_ip;
 
 use std::net::IpAddr;
+use lazy_static::lazy_static;
 
 ///得到本地ip
 pub fn get_local_ip() -> Option<IpAddr> {

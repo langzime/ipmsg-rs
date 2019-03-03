@@ -12,11 +12,12 @@ use std::path::{PathBuf, Path};
 use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
+use log::{info, trace, warn};
 use crate::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
 use crate::events::model::ModelEvent;
 use crate::message;
 use crate::constant;
-use crate::app::GLOBAL_CHATWINDOWS;
+//use crate::app::GLOBAL_CHATWINDOWS;
 
 // make moving clones into closures more convenient
 
@@ -90,6 +91,8 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             let fid: u32 = model.get_value(&iter, 1).get().unwrap();
             let pid: u32 = model.get_value(&iter, 2).get().unwrap();
             let file_type: u8 = model.get_value(&iter, 3).get().unwrap();
+            let size: u64 = model.get_value(&iter, 4).get().unwrap();
+            let mtime: i64 = model.get_value(&iter, 5).get().unwrap();
             let file_chooser = gtk::FileChooserDialog::new(
                 Some("保存文件"), Some(&chat_window_open_save), gtk::FileChooserAction::CreateFolder);
             file_chooser.add_buttons(&[
@@ -103,7 +106,9 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                     file_id: fid,
                     packet_id: pid,
                     name: name,
-                    attr: file_type
+                    attr: file_type,
+                    size,
+                    mtime
                 }, save_base_path, download_ip: host_ip.clone() });
             }
             file_chooser.destroy();
@@ -147,8 +152,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                 size: size,
                 mtime: Local::now().time(),
                 atime: Local::now().time(),
-                crtime: Local::now().time(),
-                is_selected: false,
+                crtime: Local::now().time()
             };
             let ref mut files_add = *pre_send_files_open_file.borrow_mut();
             files_add.push(file_info.clone());//添加待发送文件
@@ -191,7 +195,6 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                 mtime: Local::now().time(),
                 atime: Local::now().time(),
                 crtime: Local::now().time(),
-                is_selected: false,
             };
             let ref mut files_add = *pre_send_files_open_dir.borrow_mut();
             files_add.push(file_info.clone());//添加待发送文件
@@ -209,7 +212,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     chat_window.show_all();
     let clone_chat = chat_window.clone();
     let clone_hist_view = text_view_history.clone();
-    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: host_ip, pre_send_files: pre_send_files, received_store: pre_received_files_model}
+    ChatWindow{ win: clone_chat, his_view:  clone_hist_view, ip: host_ip, pre_send_files, received_store: pre_received_files_model}
 }
 
 fn append_column(tree: &TreeView, id: i32, title: &str) {
@@ -228,7 +231,7 @@ fn create_and_fill_model() -> ListStore {
 }
 
 fn create_and_fill_model1() -> ListStore {
-    let model = ListStore::new(&[String::static_type(), u32::static_type(), u32::static_type(), u8::static_type()]);
+    let model = ListStore::new(&[String::static_type(), u32::static_type(), u32::static_type(), u8::static_type(), u64::static_type(), i64::static_type()]);
     model
 }
 

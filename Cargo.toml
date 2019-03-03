@@ -12,18 +12,14 @@ edition = "2018"
 [lib]
 name = "raudient"
 
-[[bin]]
-name = "raudient"
-path = "src/bin/raudient.rs"
-
 [dependencies]
 chrono = "0.4.4"
 hostname = "0.1.5"
 local-ip = "0.1.0"
 encoding = "0.2.33"
 lazy_static = "1.0.0"
-log = "0.3"
-env_logger = "0.3"
+log = "0.4"
+env_logger = "0.6"
 quick-error = "1.2.2"
 crossbeam-channel = "^0.3"
 gio = "0.6.0"
@@ -36,7 +32,7 @@ version = "0.6.0"
 #git = "https://github.com/gtk-rs/gtk.git"
 
 [dependencies.glib]
-version = "0.7.0"
+version = "^0.7"
 #git = "https://github.com/gtk-rs/glib"
 
 [features]

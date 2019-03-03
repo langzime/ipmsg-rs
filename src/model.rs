@@ -197,8 +197,7 @@ pub struct FileInfo {
     //文件最后一次访问时间
     pub atime: NaiveTime,
     //文件创建时间
-    pub crtime: NaiveTime,
-    pub is_selected: bool,
+    pub crtime: NaiveTime
 }
 
 impl FileInfo {
@@ -218,6 +217,8 @@ pub struct ReceivedSimpleFileInfo {
     pub packet_id: u32,
     pub name: String,
     pub attr: u8,// 1 普通文件 2 文件夹
+    pub size: u64,
+    pub mtime: i64,
 }
 
 #[derive(Clone, Debug)]
