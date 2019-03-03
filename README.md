@@ -1,11 +1,5 @@
-# rust写的飞鸽传书
+# ipmsg rewrite by rust 
 
-rust是最流行的周末语言，也来凑凑热闹，练练手
+Rust, the most popular weekend language,
 
-###### 实现功能
-* [x] 发送上线消息
-* [x] 接收上线消息
-* [x] 发送文本消息包含界面
-* [x] 接收显示文本消息包含界面
-* [x] 发送带附件消息包含界面，支持文件和文件夹
-* [x] 接收带附件消息包含界面，支持文件和文件夹
+use it do some things.
