@@ -1,8 +1,8 @@
 [package]
 name = "raudient"
-version = "0.3.1"
-authors = ["towangyanqing@gmail.com"]
-description = "Rust language version of ipmessager"
+version = "0.3.2"
+authors = ["wangyanqing@langzi.me"]
+description = "ipmsg rewrite by rust."
 repository = "https://github.com/langzime/raudient"
 documentation = "https://docs.rs/raudient"
 keywords = ["ipmsg", "ipmessager"]
