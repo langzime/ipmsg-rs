@@ -1,9 +1,9 @@
 [package]
 name = "raudient"
-version = "0.2.0"
+version = "0.3.1"
 authors = ["towangyanqing@gmail.com"]
 description = "Rust language version of ipmessager"
-repository = "https://github.com/wyq756543431/raudient"
+repository = "https://github.com/langzime/raudient"
 documentation = "https://docs.rs/raudient"
 keywords = ["ipmsg", "ipmessager"]
 license = "MIT"
@@ -11,6 +11,10 @@ edition = "2018"
 
 [lib]
 name = "raudient"
+
+[[bin]]
+name = "raudient"
+path = "src/bin/raudient.rs"
 
 [dependencies]
 chrono = "0.4.4"
