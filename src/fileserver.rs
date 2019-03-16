@@ -111,7 +111,7 @@ impl FileServer {
                 let file_info = result_share_file.file_info.iter().find(|ref f| f.file_id == file_id as u32);
                 if let Some(file_info) = file_info {
                     let mut f: File = File::open(&file_info.file_name).unwrap();
-                    let mut buf = [0; 1024];
+                    let mut buf = [0; 1024 * 10];
                     let mut buffer = BufWriter::new(stream_echo);
                     while let Ok(bytes_read) = f.read(&mut buf) {
                         if bytes_read == 0 { break; }
@@ -135,7 +135,7 @@ pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
                 let header = make_header(sub);
                 buffer.write(util::utf8_to_gb18030(&header).as_slice()).unwrap();
                 info!("{:?}", header);
-                let mut buf = [0; 1024 * 4];
+                let mut buf = [0; 1024 * 10];
                 let mut f: File = File::open(sub).unwrap();
                 while let Ok(bytes_read) = f.read(&mut buf) {
                     if bytes_read == 0 { break; }

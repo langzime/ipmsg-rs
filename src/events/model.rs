@@ -96,14 +96,14 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
     thread::spawn(move || {
         while let Ok(ev) = receiver.recv() {
             match ev {
+                ModelEvent::ReceivedPacket {packet} => {
+                    model_packet_dispatcher(packet, model_event_sender.clone());
+                }
                 ModelEvent::UserListSelected(text) => {
                     ui_event_sender.send(UiEvent::UpdateUserListFooterStatus(text)).unwrap();
                 }
                 ModelEvent::UserListDoubleClicked {name, ip} => {
                     ui_event_sender.send(UiEvent::OpenOrReOpenChatWindow {name, ip}).unwrap();
-                }
-                ModelEvent::ReceivedPacket {packet} => {
-                    model_packet_dispatcher(packet, model_event_sender.clone());
                 }
                 ModelEvent::BroadcastEntry(packet) => {
                     socket_clone.set_broadcast(true).unwrap();

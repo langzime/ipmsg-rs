@@ -112,6 +112,8 @@ pub fn build_ui(application: &gtk::Application){
 
     let mut chat_windows: HashMap<String, ChatWindow> = HashMap::new();
 
+    //windows: &Rc<RefCell<HashMap<usize, glib::WeakRef<gtk::Window>>>>
+
     tree.connect_row_activated(clone!(model_sender => move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
@@ -197,7 +199,13 @@ pub fn build_ui(application: &gtk::Application){
                 }
             }
             UiEvent::CloseChatWindow(ip) => {
-                &chat_windows.remove(&ip);
+                match &chat_windows.get(&ip) {
+                    Some(win) => {
+                        &chat_windows.remove(&ip);
+                    }
+                    None => {
+                    }
+                }
             }
             UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet} => {
                 match &chat_windows.get(&ip) {

@@ -204,8 +204,9 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     }));
 
 
-    chat_window.connect_delete_event(clone!(model_sender, host_ip => move|_, _| {
+    chat_window.connect_delete_event(clone!(model_sender, host_ip, chat_window => move|_, _| {
         model_sender.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: host_ip.clone()}).unwrap();
+        chat_window.destroy();
         Inhibit(false)
     }));
 
