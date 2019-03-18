@@ -8,5 +8,6 @@ mod chat_window;
 mod download;
 mod events;
 mod fileserver;
+mod main_win;
 pub mod app;
 

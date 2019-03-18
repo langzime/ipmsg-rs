@@ -7,11 +7,13 @@ use chrono::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use log::{info, trace, warn, debug, error};
+use combine::parser::Parser;
 use crate::model::{Packet, User, ReceivedSimpleFileInfo, ReceivedPacketInner, FileInfo, ShareInfo};
 use crate::download::{PoolFile, ManagerPool};
 use crate::fileserver::FileServer;
 use crate::events::ui::UiEvent;
 use crate::constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_LIMITED_BROADCAST};
+use crate::util::packet_parser;
 
 pub enum ModelEvent {
     UserListSelected(String),
@@ -65,22 +67,15 @@ pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEv
                     //todo 默认是用中文编码 可配置化
                     let receive_str = GB18030.decode(&buf[0..amt], DecoderTrap::Strict).unwrap();
                     info!("receive raw message -> {:?} from ip -> {:?}", receive_str, src.ip());
-                    let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
-                    if v.len() > 4 {
-                        let mut packet = Packet::from(String::from(v[0]),
-                                                      String::from(v[1]),
-                                                      String::from(v[2]),
-                                                      String::from(v[3]),
-                                                      v[4].parse::<u32>().unwrap(),
-                                                      None
-                        );
-                        if v.len() > 5 {
-                            packet.additional_section = Some(String::from(v[5]));
+                    let result = packet_parser().parse(receive_str.as_str());
+                    match result {
+                        Ok((mut packet, _)) => {
+                            packet.ip = src.ip().to_string();
+                            sender.send(ModelEvent::ReceivedPacket {packet}).unwrap();
                         }
-                        packet.ip = src.ip().to_string();
-                        sender.send(ModelEvent::ReceivedPacket {packet}).unwrap();
-                    }else {
-                        error!("Invalid packet {} !", receive_str);
+                        Err(_) => {
+                            error!("Invalid packet {} !", receive_str);
+                        }
                     }
                 },
                 Err(e) => {
@@ -187,9 +182,6 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
     }
     let opt = constant::get_opt((&packet).command_no);
     let cmd = constant::get_mode((&packet).command_no);
-    //info!("{:?}", &packet);
-    //info!("{:x}", &packet.packet_no.parse::<i32>().unwrap());
-    //info!("cmd {:x} opt {:x} opt section {:?}", cmd, opt, extstr);
     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
         let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some((&packet).packet_no.to_string()));
         model_event_sender.send(ModelEvent::RecMsgReply{packet: recvmsg, from_ip: (&packet).ip.to_owned()});

@@ -1,7 +1,7 @@
 use std::net::TcpStream;
 use chrono::prelude::*;
-use crate::constant::{self, IPMSG_VERSION};
 use std::path::{PathBuf, Path};
+use crate::constant::{self, IPMSG_VERSION};
 
 ///
 /// 数据包格式
@@ -254,4 +254,9 @@ impl ReceivedPacketInner {
         self.opt_files = opt_files;
         self
     }
+}
+
+pub struct ErrMsg {
+    pub msg: String,
+    pub fatal: bool,
 }

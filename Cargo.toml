@@ -28,8 +28,8 @@ quick-error = "1.2.2"
 crossbeam-channel = "^0.3"
 gio = "0.6.0"
 gdk-pixbuf = "^0.6.0"
-#generator = "0.6.10"
-#nom = "2.2.1"
+combine = "^3.8"
+human-panic = "^1"
 
 [dependencies.gtk]
 version = "0.6.0"

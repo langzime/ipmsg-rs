@@ -9,8 +9,10 @@ use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use chrono::prelude::*;
 use log::{info, trace, warn, debug};
+use combine::parser::Parser;
 use crate::model::{FileInfo, Packet, ShareInfo};
 use crate::{constant, util};
+use crate::util::packet_parser;
 
 #[derive(Clone, Debug)]
 pub struct FileServer {
@@ -35,42 +37,43 @@ impl FileServer {
                 let base_stream = stream.unwrap().try_clone().unwrap();
                 //let search_arc = search_arc_tmp.clone();
                 let pool_tmp = pool_tmp.clone();
+                let src = base_stream.peer_addr().unwrap();
                 thread::spawn(move || {
                     let mut stream_echo = base_stream;
                     let mut buf = [0; 2048];
-                    stream_echo.read(&mut buf[..]).unwrap();
-                    let tmp_str = GB18030.decode(&buf, DecoderTrap::Strict).unwrap();
-                    let receive_str = tmp_str.trim_end_matches('\u{0}');
-                    info!("file_processer receive raw str {:?}", receive_str);
-                    let v: Vec<&str> = receive_str.splitn(6, |c| c == ':').collect();
-                    if v.len() > 4 {
-                        let mut packet = Packet::from(String::from(v[0]),
-                                                      String::from(v[1]),
-                                                      String::from(v[2]),
-                                                      String::from(v[3]),
-                                                      v[4].parse::<u32>().unwrap(),
-                                                      None
-                        );
-                        if v.len() > 5 {
+                    let byte_size = stream_echo.read(&mut buf[..]).unwrap();
+                    let mut tmp_buf = &buf[0..byte_size];
+                    let tmp_str = GB18030.decode(&tmp_buf, DecoderTrap::Strict).unwrap();
+                    info!("file_processer receive raw str {:?}", tmp_str);
+                    let result = packet_parser().parse(tmp_str.as_str());
+                    match result {
+                        Ok((mut packet, _)) => {
+                            packet.ip = src.ip().to_string();
                             let cmd = constant::get_mode(packet.command_no);
-                            if cmd == constant::IPMSG_GETFILEDATA {
-                                //文件请求
-                                FileServer::process_file(&pool_tmp, &mut stream_echo, &v)
-                            }else if cmd == constant::IPMSG_GETDIRFILES {
-                                FileServer::process_dir(pool_tmp, stream_echo, v)
-                            }else {
-                                info!("Invalid packet tcp file cmd {:?} !", receive_str);
+                            if packet.additional_section.is_some() {
+                                if cmd == constant::IPMSG_GETFILEDATA {
+                                        //文件请求
+                                    FileServer::process_file(&pool_tmp, &mut stream_echo, packet.additional_section.unwrap())
+                                }else if cmd == constant::IPMSG_GETDIRFILES {
+                                    FileServer::process_dir(pool_tmp, stream_echo, packet.additional_section.unwrap())
+                                }else {
+                                    info!("Invalid packet tcp file cmd {:?} !", tmp_str);
+                                }
+                            }else{
+                                info!("Invalid packet additional_section is none {:?} !", tmp_str);
                             }
                         }
+                        Err(_) => {
+                            info!("Invalid packet tcp file cmd {:?} !", tmp_str);
+                        }
                     }
-
                 });
             }
         });
     }
 
-    fn process_dir(pool_tmp: Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: TcpStream, v: Vec<&str>) -> () {
-        let file_attr = v[5].splitn(3, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+    fn process_dir(pool_tmp: Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: TcpStream, ext_str: String) -> () {
+        let file_attr = ext_str.splitn(3, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
         info!("file dir packet parse {:?}", file_attr);
         if file_attr.len() >= 2 {
             let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
@@ -93,8 +96,8 @@ impl FileServer {
         }
     }
 
-    fn process_file(pool_tmp: &Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: &mut TcpStream, v: &Vec<&str>) -> () {
-        let file_attr = v[5].splitn(4, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+    fn process_file(pool_tmp: &Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: &mut TcpStream, ext_str: String) -> () {
+        let file_attr = ext_str.splitn(4, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
         info!("file packet parse {:?}", file_attr);
         if file_attr.len() >= 3 {
             let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
