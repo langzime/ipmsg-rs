@@ -23,9 +23,11 @@ use log::{info, trace, warn, debug};
 use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner, ErrMsg};
 use crate::chat_window::ChatWindow;
 use crate::events::{ui::UiEvent, model::ModelEvent, model::model_run};
+use crate::fileserver::FileServer;
+use crate::manager_win::ManagerWindow;
 
 pub struct MainWindow {
-
+    manager_window: Option<ManagerWindow>,
 }
 
 impl MainWindow {
@@ -33,6 +35,8 @@ impl MainWindow {
     pub fn new(application: &Application) -> MainWindow {
         let (tx, rx): (glib::Sender<UiEvent>, glib::Receiver<UiEvent>) = MainContext::channel::<UiEvent>(glib::PRIORITY_HIGH);
         let (model_sender, model_receiver): (crossbeam_channel::Sender<ModelEvent>, crossbeam_channel::Receiver<ModelEvent>) = unbounded();
+
+        //let (tx, rx): (glib::Sender<UiEvent>, glib::Receiver<UiEvent>) = MainContext::channel::<UiEvent>(glib::PRIORITY_DEFAULT);
 
         let window = gtk::ApplicationWindow::new(application);
         window.set_title("飞鸽传书");
@@ -50,8 +54,10 @@ impl MainWindow {
         let menu_bar = MenuBar::new();
         let sytem_item = MenuItem::new_with_label("系统");
         let menu_sys = Menu::new();
+        let file_manager = MenuItem::new_with_label("发送文件监视");
         let about = MenuItem::new_with_label("关于");
         let quit = MenuItem::new_with_label("退出");
+        menu_sys.append(&file_manager);
         menu_sys.append(&about);
         menu_sys.append(&quit);
         sytem_item.set_submenu(Some(&menu_sys));
@@ -67,6 +73,15 @@ impl MainWindow {
             p.set_transient_for(Some(&window));
             p.run();
             p.destroy();
+        }));
+
+        let manager_win = None;
+        file_manager.connect_activate(clone!(application => move |_|{
+            /*if let Some(win) = &manager_win {
+            }else{
+
+            }*/
+            manager_win.as_mut() = Some(ManagerWindow::new(&application));
         }));
 
         quit.connect_activate(clone!(window => move |_| {
@@ -114,6 +129,11 @@ impl MainWindow {
         };
 
         model_run(socket.try_clone().unwrap(), model_receiver, model_sender.clone(),tx);
+
+        gtk::timeout_add_seconds(1, move || {
+            //info!("timeout_add");
+            glib::Continue(true)
+        });
 
         let main_context = MainContext::default();
         main_context.acquire();
@@ -263,7 +283,7 @@ impl MainWindow {
 
         window.add(&v_box);
         window.show_all();
-        MainWindow{}
+        MainWindow{ manager_window: manager_win }
     }
 }
 

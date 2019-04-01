@@ -35,9 +35,7 @@ pub enum ModelEvent {
 
 pub fn model_run(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelEvent>, model_event_sender: crossbeam_channel::Sender<ModelEvent>, ui_event_sender: glib::Sender<UiEvent>) {
 
-    let file_pool: Arc<Mutex<Vec<ShareInfo>>> = Arc::new(Mutex::new(Vec::new()));
-
-    let file_server = FileServer::new(file_pool.clone());
+    let file_server = FileServer::new(Arc::new(Mutex::new(Vec::new())));
 
     file_server.run();
 
