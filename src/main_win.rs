@@ -9,17 +9,18 @@ use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::env::args;
 use human_panic::setup_panic;
-use gio::{ApplicationExt, ApplicationExtManual, ApplicationFlags};
+use gio::{ApplicationExt, ApplicationFlags};
 use gtk::prelude::*;
 use gtk::{
     self, CellRendererText, CellRendererProgress, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
-    WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment, ListBox, ListBoxRow, Application
+    WindowPosition, WindowType, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
+    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, ListBox, ListBoxRow, Application
 };
 use gdk_pixbuf::Pixbuf;
 use glib::{Receiver, MainContext};
 use crossbeam_channel::unbounded;
 use log::{info, trace, warn, debug};
+use glib::clone;
 use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner, ErrMsg};
 use crate::chat_window::ChatWindow;
 use crate::events::{ui::UiEvent, model::ModelEvent, model::model_run};
@@ -39,41 +40,47 @@ impl MainWindow {
         window.set_position(gtk::WindowPosition::Center);
         window.set_default_size(200, 500);
         window.set_resizable(false);
-        window.connect_delete_event(clone!(window => move |_, _| {
-            &window.destroy();
-            Inhibit(false)
+        window.connect_delete_event(clone!(@weak window => @default-return Inhibit(false), move |_, _| {
+            unsafe {
+                &window.destroy();
+            }
+            return Inhibit(false);
         }));
 
         //纵向
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
 
         let menu_bar = MenuBar::new();
-        let sytem_item = MenuItem::new_with_label("系统");
+        let sytem_item = MenuItem::with_label("系统");
         let menu_sys = Menu::new();
-        let about = MenuItem::new_with_label("关于");
-        let quit = MenuItem::new_with_label("退出");
+        let about = MenuItem::with_label("关于");
+        let quit = MenuItem::with_label("退出");
         menu_sys.append(&about);
         menu_sys.append(&quit);
         sytem_item.set_submenu(Some(&menu_sys));
         menu_bar.append(&sytem_item);
 
-        about.connect_activate(clone!( window => move |_| {
+        about.connect_activate(clone!(@weak  window => move |_| {
             let p = AboutDialog::new();
             p.set_website_label(Some("ipmsg"));
             p.set_website(Some("https://www.langzi.me"));
             p.set_authors(&["langzi"]);
-            p.set_logo(&Pixbuf::new_from_file("./resources/eye.png").unwrap());
+            p.set_logo(Some(&Pixbuf::from_file("./resources/eye.png").unwrap()));
             p.set_title("关于");
             p.set_transient_for(Some(&window));
             p.run();
-            p.destroy();
+            unsafe {
+             p.destroy();
+            }
         }));
 
-        quit.connect_activate(clone!(window => move |_| {
-            &window.destroy();
+        quit.connect_activate(clone!(@weak window => move |_| {
+            unsafe {
+                &window.destroy();
+            }
         }));
 
-        let label = Label::new("");
+        let label = Label::new(Option::from(""));
         let scrolled = ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
         scrolled.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
         let tree = create_and_setup_view();
@@ -86,21 +93,21 @@ impl MainWindow {
         v_box.add(&label);
         model_sender.clone().send(ModelEvent::UserListSelected(String::from("未选择"))).unwrap();
 
-        tree.connect_cursor_changed(clone!(model_sender => move |tree_view| {
+        tree.connect_cursor_changed(clone!(@strong model_sender => move |tree_view| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
-            let str1 = model.get_value(&iter, 0).get::<String>().unwrap();
+            let str1 = model.get_value(&iter, 0).get::<String>().unwrap().unwrap();
             model_sender.send(ModelEvent::UserListSelected(str1)).unwrap();
         }
     }));
 
         let mut chat_windows: HashMap<String, ChatWindow> = HashMap::new();
 
-        tree.connect_row_activated(clone!(model_sender => move |tree_view, tree_path, tree_view_column| {
+        tree.connect_row_activated(clone!(@strong model_sender => move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
-            let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
-            let name = model.get_value(&iter, 0).get::<String>().unwrap();
+            let ip_str = model.get_value(&iter, 3).get::<String>().unwrap().unwrap();
+            let name = model.get_value(&iter, 0).get::<String>().unwrap().unwrap();
             model_sender.send(ModelEvent::UserListDoubleClicked{name, ip: ip_str }).unwrap();
         }
     }));
@@ -117,7 +124,7 @@ impl MainWindow {
 
         let main_context = MainContext::default();
         main_context.acquire();
-        rx.attach(&main_context, move |event| {
+        rx.attach(Some(&main_context), move |event| {
             match event {
                 UiEvent::OpenOrReOpenChatWindow {name, ip} => {
                     match &chat_windows.get(&ip) {
@@ -135,14 +142,14 @@ impl MainWindow {
                 UiEvent::UserListRemoveOne(ip) => {
                     if let Some(first) = model.get_iter_first(){//拿出来第一条
                         let mut num :u32 = model.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
-                        let ip1 = model.get_value(&first, 3).get::<String>().unwrap();//获取ip
+                        let ip1 = model.get_value(&first, 3).get::<String>().unwrap().unwrap();//获取ip
                         if ip == ip1 {
                             model.remove(&first);
                         }else {
                             loop {
                                 num = num + 1;
                                 if let Some(next_iter) = model.get_iter_from_string(&num.to_string()){
-                                    let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
+                                    let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap().unwrap();//获取ip
                                     if next_ip == ip1 {
                                         model.remove(&next_iter);
                                         break;
@@ -158,14 +165,14 @@ impl MainWindow {
                     let mut in_flag = false;
                     if let Some(first) = model.get_iter_first(){//拿出来第一条
                         let mut num :u32 = model.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
-                        let ip = model.get_value(&first, 3).get::<String>().unwrap();//获取ip
+                        let ip = model.get_value(&first, 3).get::<String>().unwrap().unwrap();//获取ip
                         if ip == income_user.ip {
                             in_flag = true;
                         }else {
                             loop {
                                 num = num + 1;
                                 if let Some(next_iter) = model.get_iter_from_string(&num.to_string()){
-                                    let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
+                                    let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap().unwrap();//获取ip
                                     if next_ip == income_user.ip {
                                         in_flag = true;
                                         break;
@@ -230,16 +237,16 @@ impl MainWindow {
                             let pre_receive_file_store = &win.received_store;
                             if let Some(first) = pre_receive_file_store.get_iter_first(){
                                 let mut num :u32 = pre_receive_file_store.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
-                                let received_file_id = pre_receive_file_store.get_value(&first, 1).get::<u32>().unwrap();
-                                let received_packet_id = pre_receive_file_store.get_value(&first, 2).get::<u32>().unwrap();
+                                let received_file_id = pre_receive_file_store.get_value(&first, 1).get::<u32>().unwrap().unwrap();
+                                let received_packet_id = pre_receive_file_store.get_value(&first, 2).get::<u32>().unwrap().unwrap();
                                 if file_id == received_file_id&&packet_id == received_packet_id {
                                     pre_receive_file_store.remove(&first);
                                 }else {
                                     loop {
                                         num = num + 1;
                                         if let Some(next_iter) = pre_receive_file_store.get_iter_from_string(&num.to_string()){
-                                            let next_file_id = pre_receive_file_store.get_value(&next_iter, 1).get::<u32>().unwrap();
-                                            let next_packet_id = pre_receive_file_store.get_value(&next_iter, 2).get::<u32>().unwrap();
+                                            let next_file_id = pre_receive_file_store.get_value(&next_iter, 1).get::<u32>().unwrap().unwrap();
+                                            let next_packet_id = pre_receive_file_store.get_value(&next_iter, 2).get::<u32>().unwrap().unwrap();
                                             if next_file_id == file_id&&next_packet_id == packet_id {
                                                 pre_receive_file_store.remove(&next_iter);
                                                 break;

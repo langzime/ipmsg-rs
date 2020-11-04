@@ -1,8 +1,8 @@
 use gtk::prelude::*;
 use gtk::{
     self, CellRendererText, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
-    WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment, ButtonBox, WrapMode
+    WindowPosition, WindowType, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
+    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, ButtonBox, WrapMode
 };
 use std::sync::{Arc, Mutex};
 use std::cell::RefCell;
@@ -13,6 +13,7 @@ use std::fs::{self, File, Metadata, ReadDir};
 use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use log::{info, trace, warn};
+use glib::clone;
 use crate::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
 use crate::events::model::ModelEvent;
 use crate::message;
@@ -72,7 +73,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     let pre_received_files_model = create_and_fill_model1();
     tree_view_received.set_model(Some(&pre_received_files_model));
     let files_send_clone = pre_send_files.clone();
-    btn_send.connect_clicked(clone!(model_sender, pre_send_files_model, host_ip, text_view_presend => move|_|{
+    btn_send.connect_clicked(clone!(@strong model_sender, @weak pre_send_files_model, @strong host_ip, @weak text_view_presend => move|_|{
         let (start_iter, mut end_iter) = text_view_presend.get_buffer().unwrap().get_bounds();
         let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
         let (packet, share_file) = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), host_ip.clone());
@@ -84,15 +85,15 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
 
     let chat_window_open_save = chat_window.clone();
 
-    tree_view_received.connect_row_activated(clone!(model_sender, host_ip => move |tree_view, tree_path, tree_view_column| {
+    tree_view_received.connect_row_activated(clone!(@strong model_sender, @strong host_ip => move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.get_selection();
         if let Some((model, iter)) = selection.get_selected() {
-            let name: String = model.get_value(&iter, 0).get().unwrap();
-            let fid: u32 = model.get_value(&iter, 1).get().unwrap();
-            let pid: u32 = model.get_value(&iter, 2).get().unwrap();
-            let file_type: u8 = model.get_value(&iter, 3).get().unwrap();
-            let size: u64 = model.get_value(&iter, 4).get().unwrap();
-            let mtime: i64 = model.get_value(&iter, 5).get().unwrap();
+            let name: String = model.get_value(&iter, 0).get().unwrap().unwrap();
+            let fid: u32 = model.get_value(&iter, 1).get().unwrap().unwrap();
+            let pid: u32 = model.get_value(&iter, 2).get().unwrap().unwrap();
+            let file_type: u8 = model.get_value(&iter, 3).get().unwrap().unwrap();
+            let size: u64 = model.get_value(&iter, 4).get().unwrap().unwrap();
+            let mtime: i64 = model.get_value(&iter, 5).get().unwrap().unwrap();
             let file_chooser = gtk::FileChooserDialog::new(
                 Some("保存文件"), Some(&chat_window_open_save), gtk::FileChooserAction::CreateFolder);
             file_chooser.add_buttons(&[
@@ -111,18 +112,21 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                     mtime
                 }, save_base_path, download_ip: host_ip.clone() });
             }
-            file_chooser.destroy();
+            unsafe {
+                file_chooser.destroy();
+            }
+
         }
     }));
 
-    btn_clear.connect_clicked(clone!(text_view_presend => move|_|{
+    btn_clear.connect_clicked(clone!(@weak text_view_presend => move|_|{
         &text_view_presend.get_buffer().unwrap().set_text("");
     }));
 
     let chat_window_open_file = chat_window.clone();
     let pre_send_files_open_file = pre_send_files.clone();
 
-    btn_file.connect_clicked(clone!(pre_send_files_model => move|_|{
+    btn_file.connect_clicked(clone!(@weak pre_send_files_model => move|_|{
         let file_chooser = gtk::FileChooserDialog::new(
             Some("打开文件"), Some(&chat_window_open_file), gtk::FileChooserAction::Open);
         file_chooser.add_buttons(&[
@@ -158,13 +162,15 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             files_add.push(file_info.clone());//添加待发送文件
             pre_send_files_model.insert_with_values(None, &[0, 1], &[&&name, &format!("{}", &file_info.file_id)]);
         }
-        file_chooser.destroy();
+        unsafe {
+                file_chooser.destroy();
+            }
     }));
 
     let chat_window_open_dir = chat_window.clone();
     let pre_send_files_open_dir = pre_send_files.clone();
 
-    btn_dir.connect_clicked(clone!(pre_send_files_model => move|_|{
+    btn_dir.connect_clicked(clone!(@weak pre_send_files_model => move|_|{
         let file_chooser = gtk::FileChooserDialog::new(
             Some("打开文件夹"), Some(&chat_window_open_dir), gtk::FileChooserAction::SelectFolder);
         file_chooser.add_buttons(&[
@@ -200,14 +206,18 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             files_add.push(file_info.clone());//添加待发送文件
             pre_send_files_model.insert_with_values(None, &[0, 1], &[&name, &format!("{}", &file_info.file_id)]);
         }
-        file_chooser.destroy();
+        unsafe {
+                file_chooser.destroy();
+            }
     }));
 
 
-    chat_window.connect_delete_event(clone!(model_sender, host_ip, chat_window => move|_, _| {
+    chat_window.connect_delete_event(clone!(@strong model_sender, @strong host_ip, @weak chat_window => @default-return Inhibit(false),  move|_, _| {
         model_sender.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: host_ip.clone()}).unwrap();
-        chat_window.destroy();
-        Inhibit(false)
+        unsafe {
+                chat_window.destroy();
+            }
+        return Inhibit(false);
     }));
 
     chat_window.show_all();

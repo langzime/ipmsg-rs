@@ -9,12 +9,13 @@ use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::env::args;
 use human_panic::setup_panic;
-use gio::{ApplicationExt, ApplicationExtManual, ApplicationFlags};
+use gio::{ApplicationExt, ApplicationFlags};
+use gio::prelude::*;
 use gtk::prelude::*;
 use gtk::{
     self, CellRendererText, CellRendererProgress, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
-    WindowPosition, WindowType, StatusIcon, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, Alignment, ListBox, ListBoxRow
+    WindowPosition, WindowType, ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
+    ReliefStyle, Widget, TextView, Fixed, ScrolledWindow, ListBox, ListBoxRow
 };
 use gdk_pixbuf::Pixbuf;
 use glib::{Receiver, MainContext};
