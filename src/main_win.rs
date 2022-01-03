@@ -9,7 +9,7 @@ use std::net::UdpSocket;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::env::args;
 use human_panic::setup_panic;
-use gio::{ApplicationExt, ApplicationFlags};
+use gio::ApplicationFlags;
 use gtk::prelude::*;
 use gtk::{
     self, CellRendererText, CellRendererProgress, AboutDialog, CheckMenuItem, IconSize, Image, Label, Menu, MenuBar, MenuItem, Window,
@@ -94,9 +94,9 @@ impl MainWindow {
         model_sender.clone().send(ModelEvent::UserListSelected(String::from("未选择"))).unwrap();
 
         tree.connect_cursor_changed(clone!(@strong model_sender => move |tree_view| {
-        let selection = tree_view.get_selection();
-        if let Some((model, iter)) = selection.get_selected() {
-            let str1 = model.get_value(&iter, 0).get::<String>().unwrap().unwrap();
+        let selection = tree_view.selection();
+        if let Some((model, iter)) = selection.selected() {
+            let str1 = model.value(&iter, 0).get::<String>().unwrap();
             model_sender.send(ModelEvent::UserListSelected(str1)).unwrap();
         }
     }));
@@ -104,10 +104,10 @@ impl MainWindow {
         let mut chat_windows: HashMap<String, ChatWindow> = HashMap::new();
 
         tree.connect_row_activated(clone!(@strong model_sender => move |tree_view, tree_path, tree_view_column| {
-        let selection = tree_view.get_selection();
-        if let Some((model, iter)) = selection.get_selected() {
-            let ip_str = model.get_value(&iter, 3).get::<String>().unwrap().unwrap();
-            let name = model.get_value(&iter, 0).get::<String>().unwrap().unwrap();
+        let selection = tree_view.selection();
+        if let Some((model, iter)) = selection.selected() {
+            let ip_str = model.value(&iter, 3).get::<String>().unwrap();
+            let name = model.value(&iter, 0).get::<String>().unwrap();
             model_sender.send(ModelEvent::UserListDoubleClicked{name, ip: ip_str }).unwrap();
         }
     }));
@@ -140,16 +140,16 @@ impl MainWindow {
                     &label.set_text(&format!("-- {} --", text));
                 }
                 UiEvent::UserListRemoveOne(ip) => {
-                    if let Some(first) = model.get_iter_first(){//拿出来第一条
-                        let mut num :u32 = model.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
-                        let ip1 = model.get_value(&first, 3).get::<String>().unwrap().unwrap();//获取ip
+                    if let Some(first) = model.iter_first(){//拿出来第一条
+                        let mut num :u32 = model.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                        let ip1 = model.value(&first, 3).get::<String>().unwrap();//获取ip
                         if ip == ip1 {
                             model.remove(&first);
                         }else {
                             loop {
                                 num = num + 1;
-                                if let Some(next_iter) = model.get_iter_from_string(&num.to_string()){
-                                    let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap().unwrap();//获取ip
+                                if let Some(next_iter) = model.iter_from_string(&num.to_string()){
+                                    let next_ip = model.value(&next_iter, 3).get::<String>().unwrap();//获取ip
                                     if next_ip == ip1 {
                                         model.remove(&next_iter);
                                         break;
@@ -163,16 +163,16 @@ impl MainWindow {
                 }
                 UiEvent::UserListAddOne(income_user) => {
                     let mut in_flag = false;
-                    if let Some(first) = model.get_iter_first(){//拿出来第一条
-                        let mut num :u32 = model.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
-                        let ip = model.get_value(&first, 3).get::<String>().unwrap().unwrap();//获取ip
+                    if let Some(first) = model.iter_first(){//拿出来第一条
+                        let mut num :u32 = model.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                        let ip = model.value(&first, 3).get::<String>().unwrap();//获取ip
                         if ip == income_user.ip {
                             in_flag = true;
                         }else {
                             loop {
                                 num = num + 1;
-                                if let Some(next_iter) = model.get_iter_from_string(&num.to_string()){
-                                    let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap().unwrap();//获取ip
+                                if let Some(next_iter) = model.iter_from_string(&num.to_string()){
+                                    let next_ip = model.value(&next_iter, 3).get::<String>().unwrap();//获取ip
                                     if next_ip == income_user.ip {
                                         in_flag = true;
                                         break;
@@ -184,7 +184,8 @@ impl MainWindow {
                         }
                     }
                     if !in_flag {
-                        model.insert_with_values(None, &[0, 1, 2, 3], &[&&income_user.name, &&income_user.group, &&income_user.host, &&income_user.ip]);
+                        //model.insert_with_values(None, &[0, 1, 2, 3], &[&&income_user.name, &&income_user.group, &&income_user.host, &&income_user.ip]);
+                        model.insert_with_values(None, &[(0, &&income_user.name), (1, &&income_user.group), (2, &&income_user.host), (3, &&income_user.ip)]);
                     }
                 }
                 UiEvent::CloseChatWindow(ip) => {
@@ -211,8 +212,8 @@ impl MainWindow {
                 UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files} => {
                     match &chat_windows.get(&to_ip) {
                         Some(win) => {
-                            let (his_start_iter, mut his_end_iter) = win.his_view.get_buffer().unwrap().get_bounds();
-                            win.his_view.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
+                            let (his_start_iter, mut his_end_iter) = win.his_view.buffer().unwrap().bounds();
+                            win.his_view.buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
 
                         }
                         None => {}
@@ -221,11 +222,12 @@ impl MainWindow {
                 UiEvent::DisplayReceivedMsgInHis{ from_ip, name, context, files } => {
                     match &chat_windows.get(&from_ip) {
                         Some(win) => {
-                            let (his_start_iter, mut his_end_iter) = win.his_view.get_buffer().unwrap().get_bounds();
-                            win.his_view.get_buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", name, context).as_str());
+                            let (his_start_iter, mut his_end_iter) = win.his_view.buffer().unwrap().bounds();
+                            win.his_view.buffer().unwrap().insert(&mut his_end_iter, format!("{}:{}\n", name, context).as_str());
 
                             for file in &files {
-                                win.received_store.insert_with_values(None, &[0, 1, 2, 3, 4, 5], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr, &&file.size, &&file.mtime]);
+                                //win.received_store.insert_with_values(None, &[0, 1, 2, 3, 4, 5], &[&&file.name, &&file.file_id, &&file.packet_id, &&file.attr, &&file.size, &&file.mtime]);
+                                win.received_store.insert_with_values(None, &[(0, &&file.name), (1, &&file.file_id), (2, &&file.packet_id), (3, &&file.attr), (4, &&file.size), (5, &&file.mtime)]);
                             }
                         }
                         None => {}
@@ -235,18 +237,18 @@ impl MainWindow {
                     match &chat_windows.get(&download_ip) {
                         Some(win) => {
                             let pre_receive_file_store = &win.received_store;
-                            if let Some(first) = pre_receive_file_store.get_iter_first(){
-                                let mut num :u32 = pre_receive_file_store.get_string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
-                                let received_file_id = pre_receive_file_store.get_value(&first, 1).get::<u32>().unwrap().unwrap();
-                                let received_packet_id = pre_receive_file_store.get_value(&first, 2).get::<u32>().unwrap().unwrap();
+                            if let Some(first) = pre_receive_file_store.iter_first(){
+                                let mut num :u32 = pre_receive_file_store.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                                let received_file_id = pre_receive_file_store.value(&first, 1).get::<u32>().unwrap();
+                                let received_packet_id = pre_receive_file_store.value(&first, 2).get::<u32>().unwrap();
                                 if file_id == received_file_id&&packet_id == received_packet_id {
                                     pre_receive_file_store.remove(&first);
                                 }else {
                                     loop {
                                         num = num + 1;
-                                        if let Some(next_iter) = pre_receive_file_store.get_iter_from_string(&num.to_string()){
-                                            let next_file_id = pre_receive_file_store.get_value(&next_iter, 1).get::<u32>().unwrap().unwrap();
-                                            let next_packet_id = pre_receive_file_store.get_value(&next_iter, 2).get::<u32>().unwrap().unwrap();
+                                        if let Some(next_iter) = pre_receive_file_store.iter_from_string(&num.to_string()){
+                                            let next_file_id = pre_receive_file_store.value(&next_iter, 1).get::<u32>().unwrap();
+                                            let next_packet_id = pre_receive_file_store.value(&next_iter, 2).get::<u32>().unwrap();
                                             if next_file_id == file_id&&next_packet_id == packet_id {
                                                 pre_receive_file_store.remove(&next_iter);
                                                 break;

@@ -41,27 +41,27 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     let builder = Builder::new();
     builder.add_from_string(glade_src).unwrap();
 
-    let chat_window: Window = builder.get_object("chat_window").unwrap();
+    let chat_window: Window = builder.object("chat_window").unwrap();
     chat_window.set_title(chat_title);
     chat_window.set_border_width(5);
     //历史
-    let text_view_history: TextView = builder.get_object("text_view_history").unwrap();
+    let text_view_history: TextView = builder.object("text_view_history").unwrap();
     //待发送的
-    let text_view_presend: TextView = builder.get_object("text_view_presend").unwrap();
+    let text_view_presend: TextView = builder.object("text_view_presend").unwrap();
     //待发送文件
-    let tree_view_presend: TreeView = builder.get_object("tree_view_presend").unwrap();
+    let tree_view_presend: TreeView = builder.object("tree_view_presend").unwrap();
     //接受的文件
-    let tree_view_received: TreeView = builder.get_object("tree_view_received").unwrap();
+    let tree_view_received: TreeView = builder.object("tree_view_received").unwrap();
 
     text_view_history.set_wrap_mode(WrapMode::WordChar);
     text_view_presend.set_wrap_mode(WrapMode::WordChar);
     append_column(&tree_view_presend, 0, "待发送文件");
     append_column(&tree_view_received, 0, "收到的文件");
 
-    let btn_clear: Button = builder.get_object("btn_clear").unwrap();
-    let btn_send: Button = builder.get_object("btn_send").unwrap();//btn_file
-    let btn_file: Button = builder.get_object("btn_file").unwrap();
-    let btn_dir: Button = builder.get_object("btn_dir").unwrap();
+    let btn_clear: Button = builder.object("btn_clear").unwrap();
+    let btn_send: Button = builder.object("btn_send").unwrap();//btn_file
+    let btn_file: Button = builder.object("btn_file").unwrap();
+    let btn_dir: Button = builder.object("btn_dir").unwrap();
 
     //let text_view_presend_clone = text_view_presend.clone();
     let text_view_history_clone = text_view_history.clone();
@@ -74,26 +74,26 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     tree_view_received.set_model(Some(&pre_received_files_model));
     let files_send_clone = pre_send_files.clone();
     btn_send.connect_clicked(clone!(@strong model_sender, @weak pre_send_files_model, @strong host_ip, @weak text_view_presend => move|_|{
-        let (start_iter, mut end_iter) = text_view_presend.get_buffer().unwrap().get_bounds();
-        let context :&str = &text_view_presend.get_buffer().unwrap().get_text(&start_iter, &end_iter, false).unwrap();
+        let (start_iter, mut end_iter) = text_view_presend.buffer().unwrap().bounds();
+        let context :&str = &text_view_presend.buffer().unwrap().text(&start_iter, &end_iter, false).unwrap();
         let (packet, share_file) = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), host_ip.clone());
         model_sender.send(ModelEvent::SendOneMsg {to_ip: host_ip.clone(), packet, context: context.to_owned(), files: share_file}).unwrap();
         (*files_send_clone.borrow_mut()).clear();
         pre_send_files_model.clear();
-        &text_view_presend.get_buffer().unwrap().set_text("");
+        &text_view_presend.buffer().unwrap().set_text("");
     }));
 
     let chat_window_open_save = chat_window.clone();
 
     tree_view_received.connect_row_activated(clone!(@strong model_sender, @strong host_ip => move |tree_view, tree_path, tree_view_column| {
-        let selection = tree_view.get_selection();
-        if let Some((model, iter)) = selection.get_selected() {
-            let name: String = model.get_value(&iter, 0).get().unwrap().unwrap();
-            let fid: u32 = model.get_value(&iter, 1).get().unwrap().unwrap();
-            let pid: u32 = model.get_value(&iter, 2).get().unwrap().unwrap();
-            let file_type: u8 = model.get_value(&iter, 3).get().unwrap().unwrap();
-            let size: u64 = model.get_value(&iter, 4).get().unwrap().unwrap();
-            let mtime: i64 = model.get_value(&iter, 5).get().unwrap().unwrap();
+        let selection = tree_view.selection();
+        if let Some((model, iter)) = selection.selected() {
+            let name: String = model.value(&iter, 0).get().unwrap();
+            let fid: u32 = model.value(&iter, 1).get().unwrap();
+            let pid: u32 = model.value(&iter, 2).get().unwrap();
+            let file_type: u8 = model.value(&iter, 3).get().unwrap();
+            let size: u64 = model.value(&iter, 4).get().unwrap();
+            let mtime: i64 = model.value(&iter, 5).get().unwrap();
             let file_chooser = gtk::FileChooserDialog::new(
                 Some("保存文件"), Some(&chat_window_open_save), gtk::FileChooserAction::CreateFolder);
             file_chooser.add_buttons(&[
@@ -101,7 +101,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                 ("取消", gtk::ResponseType::Cancel.into()),
             ]);
             if file_chooser.run() == gtk::ResponseType::Ok.into() {
-                let save_base_path: PathBuf = file_chooser.get_filename().unwrap();
+                let save_base_path: PathBuf = file_chooser.filename().unwrap();
                 info!("choosed {:?} {:?} {:?} {:?} {:?}", name, fid, pid, save_base_path, file_type);
                 model_sender.send(ModelEvent::PutDownloadTaskInPool{ file: ReceivedSimpleFileInfo{
                     file_id: fid,
@@ -120,7 +120,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     }));
 
     btn_clear.connect_clicked(clone!(@weak text_view_presend => move|_|{
-        &text_view_presend.get_buffer().unwrap().set_text("");
+        &text_view_presend.buffer().unwrap().set_text("");
     }));
 
     let chat_window_open_file = chat_window.clone();
@@ -134,7 +134,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             ("取消", gtk::ResponseType::Cancel.into()),
         ]);
         if file_chooser.run() == gtk::ResponseType::Ok.into() {
-            let filename: PathBuf = file_chooser.get_filename().unwrap();
+            let filename: PathBuf = file_chooser.filename().unwrap();
             let metadata: Metadata = fs::metadata(&filename).unwrap();
             let size = metadata.len();
             let attr = if metadata.is_file() {
@@ -160,7 +160,8 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             };
             let ref mut files_add = *pre_send_files_open_file.borrow_mut();
             files_add.push(file_info.clone());//添加待发送文件
-            pre_send_files_model.insert_with_values(None, &[0, 1], &[&&name, &format!("{}", &file_info.file_id)]);
+            //pre_send_files_model.insert_with_values(None, &[0, 1], &[&&name, &format!("{}", &file_info.file_id)]);
+            pre_send_files_model.insert_with_values(None, &[(0, &&name), (1, &format!("{}", &file_info.file_id))]);
         }
         unsafe {
                 file_chooser.destroy();
@@ -178,7 +179,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             ("取消", gtk::ResponseType::Cancel.into()),
         ]);
         if file_chooser.run() == gtk::ResponseType::Ok.into() {
-            let filename: PathBuf = file_chooser.get_filename().unwrap();
+            let filename: PathBuf = file_chooser.filename().unwrap();
             let metadata: Metadata = fs::metadata(&filename).unwrap();
             let size = metadata.len();
             let attr = if metadata.is_file() {
@@ -204,7 +205,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
             };
             let ref mut files_add = *pre_send_files_open_dir.borrow_mut();
             files_add.push(file_info.clone());//添加待发送文件
-            pre_send_files_model.insert_with_values(None, &[0, 1], &[&name, &format!("{}", &file_info.file_id)]);
+            pre_send_files_model.insert_with_values(None, &[(0, &name), (1, &format!("{}", &file_info.file_id))]);
         }
         unsafe {
                 file_chooser.destroy();

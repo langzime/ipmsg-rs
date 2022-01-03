@@ -153,12 +153,12 @@ pub fn get_local_ip() -> Option<IpAddr> {
 }
 
 ///得到主机名
-pub fn get_host_name() -> Option<String> {
-    host_name::get_hostname()
+pub fn get_host_name() -> String {
+    host_name::get().unwrap().into_string().unwrap()
 }
 
 lazy_static! {
-    pub static ref hostname: String = get_host_name().unwrap();
+    pub static ref hostname: String = get_host_name();
     pub static ref localip: String = get_local_ip().unwrap().to_string();
     pub static ref addr: String = format!("{}{}", "0.0.0.0:", IPMSG_DEFAULT_PORT);
 }

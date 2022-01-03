@@ -7,8 +7,8 @@ use std::time::{Duration, SystemTime};
 use chrono::TimeZone;
 use combine::error::ParseError;
 use combine::{many1, many, Parser, Stream, sep_by, token, skip_many, skip_many1, satisfy, choice, optional, any};
-use combine::range::{take_while, take_while1, take_until_range};
-use combine::char::{letter, space, digit, char};
+use combine::parser::range::{take_while, take_while1, take_until_range};
+use combine::parser::char::{letter, space, digit, char};
 use crate::model::Packet;
 
 pub fn utf8_to_gb18030<'a>(ori_str :&'a str) -> Vec<u8> {
@@ -20,10 +20,10 @@ pub fn system_time_to_date_time(t: SystemTime) -> DateTime<Utc> {
     Utc.timestamp(dur.as_secs() as i64, dur.subsec_nanos())
 }
 
-pub fn packet_parser<I>() -> impl Parser<Input=I, Output=Packet>
+pub fn packet_parser<Input>() -> impl Parser<Input, Output=Packet>
     where
-        I: Stream<Item=char>,
-        I::Error: ParseError<I::Item, I::Range, I::Position>,
+        Input: Stream<Token=char>,
+        Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     (
         many1(satisfy(|c| c != ':')),

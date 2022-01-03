@@ -41,7 +41,7 @@ impl Error for DownLoadError {
             DownLoadError::InValidType => "InValidType",
             DownLoadError::ReaDelimiterErr => "DownLoadError"
         } }
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         match *self {
             DownLoadError::IoError(ref err) => Some(err),
             DownLoadError::InValidType => None,
