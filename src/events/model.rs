@@ -53,7 +53,7 @@ pub fn model_run(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelE
 }
 
 pub fn send_ipmsg_br_entry(model_event_sender: crossbeam_channel::Sender<ModelEvent>) {
-    let packet = Packet::new(IPMSG_BR_ENTRY|IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *constant::hostname, *constant::hostname)));
+    let packet = Packet::new(IPMSG_BR_ENTRY|IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *constant::HOST_NAME, *constant::HOST_NAME)));
     model_event_sender.send(ModelEvent::BroadcastEntry(packet)).unwrap();
 }
 
@@ -104,11 +104,13 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                     socket_clone.set_broadcast(true).unwrap();
                     let addr:String = format!("{}:{}", IPMSG_LIMITED_BROADCAST, IPMSG_DEFAULT_PORT);
                     socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
+                    info!("send BroadcastEntry !");
                 }
                 ModelEvent::RecMsgReply{packet, from_ip} => {
                     let addr:String = format!("{}:{}", from_ip, constant::IPMSG_DEFAULT_PORT);
                     socket_clone.set_broadcast(false).unwrap();
                     socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
+                    info!("send RecMsgReply !");
                 }
                 ModelEvent::BroadcastExit(ip) => {
                     ui_event_sender.send(UiEvent::UserListRemoveOne(ip)).unwrap();
@@ -118,6 +120,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                         let addr:String = format!("{}:{}", from_user.ip, constant::IPMSG_DEFAULT_PORT);
                         socket_clone.set_broadcast(false).unwrap();
                         socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
+                        info!("send RecOnlineMsgReply ! {packet:?}");
                     }
                     ui_event_sender.send(UiEvent::UserListAddOne(from_user)).unwrap();
                 }
@@ -144,6 +147,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                     let addr:String = format!("{}:{}", to_ip, constant::IPMSG_DEFAULT_PORT);
                     socket_clone.set_broadcast(false).unwrap();
                     socket_clone.send_to(crate::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str()).expect("couldn't send message");
+                    info!("send SendOneMsg !");
                     ui_event_sender.send(UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files: files.clone()}).unwrap();
                     {
                         let mut file_pool = file_server.file_pool.lock().unwrap();
@@ -205,7 +209,7 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
         };
 
         let user = User::new(user_name, (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), group_name);
-
+        info!("{user:?}");
         model_event_sender.send(ModelEvent::RecOnlineMsgReply{packet: ansentry_packet, from_user: user});
     }else if cmd == constant::IPMSG_ANSENTRY {//通报新上线
         let user = User::new((&packet).sender_name.to_owned(), (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), "".to_owned());

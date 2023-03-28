@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <object class="GtkTextBuffer" id="textbuffer1"/>
+  <object class="GtkTextBuffer" id="textbuffer2"/>
+  <object class="GtkWindow" id="chat_window">
+    <property name="resizable">0</property>
+    <property name="default_width">520</property>
+    <property name="default_height">250</property>
+    <property name="child">
+      <object class="GtkGrid">
+        <property name="row_spacing">5</property>
+        <property name="column_spacing">5</property>
+        <child>
+          <object class="GtkScrolledWindow">
+            <property name="focusable">1</property>
+            <property name="min_content_width">200</property>
+            <property name="min_content_height">350</property>
+            <property name="child">
+              <object class="GtkTextView" id="text_view_history">
+                <property name="focusable">1</property>
+                <property name="editable">0</property>
+                <property name="cursor_visible">0</property>
+                <property name="buffer">textbuffer2</property>
+                <property name="accepts_tab">0</property>
+              </object>
+            </property>
+            <layout>
+              <property name="column">0</property>
+              <property name="row">0</property>
+              <property name="column-span">2</property>
+              <property name="row-span">2</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="GtkBox">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <child>
+              <object class="GtkButton" id="btn_clear">
+                <property name="label" translatable="1">清空</property>
+                <property name="focusable">1</property>
+                <property name="receives_default">1</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="btn_send">
+                <property name="label" translatable="1">发送</property>
+                <property name="focusable">1</property>
+                <property name="receives_default">1</property>
+              </object>
+            </child>
+            <layout>
+              <property name="column">0</property>
+              <property name="row">3</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="GtkScrolledWindow">
+            <property name="focusable">1</property>
+            <property name="min_content_width">160</property>
+            <property name="min_content_height">150</property>
+            <property name="child">
+              <object class="GtkTreeView" id="tree_view_presend">
+                <property name="focusable">1</property>
+                <child internal-child="selection">
+                  <object class="GtkTreeSelection"/>
+                </child>
+              </object>
+            </property>
+            <layout>
+              <property name="column">2</property>
+              <property name="row">2</property>
+              <property name="row-span">2</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="GtkScrolledWindow">
+            <property name="focusable">1</property>
+            <property name="min_content_width">350</property>
+            <property name="min_content_height">80</property>
+            <property name="child">
+              <object class="GtkTextView" id="text_view_presend">
+                <property name="focusable">1</property>
+                <property name="buffer">textbuffer1</property>
+              </object>
+            </property>
+            <layout>
+              <property name="column">0</property>
+              <property name="row">2</property>
+              <property name="column-span">2</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="GtkBox">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <child>
+              <object class="GtkButton" id="btn_file">
+                <property name="label" translatable="1">选择文件</property>
+                <property name="focusable">1</property>
+                <property name="receives_default">1</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="btn_dir">
+                <property name="label" translatable="1">选择文件夹</property>
+                <property name="focusable">1</property>
+                <property name="receives_default">1</property>
+              </object>
+            </child>
+            <layout>
+              <property name="column">1</property>
+              <property name="row">3</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="GtkImage">
+            <property name="icon_name">audio-x-generic</property>
+            <property name="icon_size">6</property>
+            <layout>
+              <property name="column">2</property>
+              <property name="row">0</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="GtkScrolledWindow">
+            <property name="focusable">1</property>
+            <property name="child">
+              <object class="GtkTreeView" id="tree_view_received">
+                <property name="focusable">1</property>
+                <child internal-child="selection">
+                  <object class="GtkTreeSelection"/>
+                </child>
+              </object>
+            </property>
+            <layout>
+              <property name="column">2</property>
+              <property name="row">1</property>
+            </layout>
+          </object>
+        </child>
+      </object>
+    </property>
+  </object>
+</interface>
