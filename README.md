@@ -1,5 +1,10 @@
-# ipmsg rewrite by rust 
+# rust版飞鸽传书
 
-Rust, the most popular weekend language,
+> 基于 GTK4 已在mac big sur下测试
 
-use it do some things.
+
+## 已实现功能
+- [x] 聊天
+- [x] 发送文件
+- [x] 接收文件
+- [ ] 编译出来各个平台的安装文件
