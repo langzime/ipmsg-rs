@@ -14,7 +14,7 @@ use gio::prelude::*;
 use log::info;
 use crate::main_win::MainWindow;
 
-pub fn run(){
+pub fn run() -> glib::ExitCode {
     setup_panic!();
     ::std::env::set_var("RUST_LOG", "info");
     drop(env_logger::init());
@@ -33,5 +33,5 @@ pub fn run(){
         info!("shutdown!");
     });
 
-    application.run();
+    application.run()
 }

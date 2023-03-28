@@ -10,8 +10,8 @@ use crate::model::{self, Packet};
 use crate::constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT};
 
 pub fn create_sendmsg(context :String, files: Vec<model::FileInfo>, tar_ip: String) -> (Packet, Option<model::ShareInfo>){
-    let commond = if (&files).len() > 0 { IPMSG_SENDMSG|IPMSG_FILEATTACHOPT } else { IPMSG_SENDMSG };//如果有文件，需要扩展文件
-    let share_info = if (&files).len() > 0 {
+    let commond = if files.len() > 0 { IPMSG_SENDMSG|IPMSG_FILEATTACHOPT } else { IPMSG_SENDMSG };//如果有文件，需要扩展文件
+    let share_info = if files.len() > 0 {
         Some(model::ShareInfo {
             packet_no: Local::now().timestamp() as u32,
             host: tar_ip.clone(),
@@ -25,7 +25,7 @@ pub fn create_sendmsg(context :String, files: Vec<model::FileInfo>, tar_ip: Stri
     };
 
     let mut additional = String::new();
-    for (i, file) in (&files).iter().enumerate() {
+    for (i, file) in files.iter().enumerate() {
         additional.push_str(file.to_fileinfo_msg().as_str());
         additional.push('\u{7}');
     }

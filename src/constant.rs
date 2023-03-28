@@ -141,15 +141,17 @@ pub fn get_opt(command: u32) -> u32 {
     command & 0xffffff00
 }
 
+///以下为程序部分
+pub const REPARENT_PATH: &'static str = ".";
+
 use ::hostname as host_name;
-use local_ip;
 
 use std::net::IpAddr;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
 ///得到本地ip
-pub fn get_local_ip() -> Option<IpAddr> {
-    local_ip::get()
+pub fn get_local_ip() -> IpAddr {
+    local_ip_address::local_ip().expect("获取本地ip失败")
 }
 
 ///得到主机名
@@ -157,10 +159,16 @@ pub fn get_host_name() -> String {
     host_name::get().unwrap().into_string().unwrap()
 }
 
-lazy_static! {
-    pub static ref hostname: String = get_host_name();
-    pub static ref localip: String = get_local_ip().unwrap().to_string();
-    pub static ref addr: String = format!("{}{}", "0.0.0.0:", IPMSG_DEFAULT_PORT);
-}
+pub static HOST_NAME: Lazy<String> = Lazy::new(||{
+    return get_host_name();
+});
+
+pub static LOCAL_IP: Lazy<String> = Lazy::new(||{
+    return get_local_ip().to_string();
+});
+
+pub static ADDR: Lazy<String> = Lazy::new(||{
+    return format!("{}{}", "0.0.0.0:", IPMSG_DEFAULT_PORT);
+});
 
 

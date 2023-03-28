@@ -12,6 +12,7 @@ use log::{info, trace, warn, debug};
 use combine::parser::Parser;
 use crate::model::{FileInfo, Packet, ShareInfo};
 use crate::{constant, util};
+use crate::constant::REPARENT_PATH;
 use crate::util::packet_parser;
 
 #[derive(Clone, Debug)]
@@ -30,9 +31,9 @@ impl FileServer {
     pub fn run(&self) {
         let pool_tmp = self.file_pool.clone();
         thread::spawn(move || {
-            let tcp_listener: TcpListener = TcpListener::bind(constant::addr.as_str()).unwrap();
+            let tcp_listener: TcpListener = TcpListener::bind(constant::ADDR.as_str()).unwrap();
             let pool_tmp = pool_tmp.clone();
-            info!("tcp server start listening! {:?}", constant::addr.as_str());
+            info!("tcp server start listening! {:?}", constant::ADDR.as_str());
             for stream in tcp_listener.incoming() {
                 let base_stream = stream.unwrap().try_clone().unwrap();
                 //let search_arc = search_arc_tmp.clone();
@@ -129,13 +130,13 @@ impl FileServer {
 
 //send dir
 pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
-    buffer.write(util::utf8_to_gb18030(&make_header(&root_path)).as_slice()).unwrap();//root dir
-    info!("{:?}", &make_header(&root_path));
+    buffer.write(util::utf8_to_gb18030(&make_header(&root_path, false)).as_slice()).unwrap();//root dir
+    debug!("{:?}", make_header(&root_path, false));
     if root_path.is_dir() {
         for sub_path in fs::read_dir(root_path).unwrap() {
             let sub = &sub_path.unwrap().path();
             if sub.is_file() {
-                let header = make_header(sub);
+                let header = make_header(sub, false);
                 buffer.write(util::utf8_to_gb18030(&header).as_slice()).unwrap();
                 info!("{:?}", header);
                 let mut buf = [0; 1024];
@@ -150,24 +151,36 @@ pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
             }
         }
     }
-
-    buffer.write("000D:.:0:3:0:".as_bytes()).unwrap();
-    info!("{:?}", "000D:.:0:3:0:");
+    let ret_parent = make_header(root_path, true);
+    buffer.write(ret_parent.as_bytes()).unwrap();
+    debug!("{ret_parent:?}");
 }
 
-pub fn make_header(path: &PathBuf) -> String {
-    let path_metadata: Metadata = fs::metadata(&path).unwrap();
-    let file_attr = if path_metadata.is_dir() {
-        constant::IPMSG_FILE_DIR
-    } else {
-        constant::IPMSG_FILE_REGULAR
-    };
+///
+/// 转换报文
+pub fn make_header(path: &PathBuf, ret_parent: bool) -> String {
+    let file_name;
+    let file_attr;
+    let file_size;
+    if ret_parent {
+        file_attr = constant::IPMSG_FILE_RETPARENT;
+        file_name = REPARENT_PATH;
+        file_size = 0;
+    }else{
+        let path_metadata: Metadata = fs::metadata(&path).unwrap();
+        file_size = path_metadata.len();
+        if path_metadata.is_dir() {
+            file_attr = constant::IPMSG_FILE_DIR;
+        } else {
+            file_attr = constant::IPMSG_FILE_REGULAR;
+        }
+    }
     let file_name: &str = &path.file_name().unwrap().to_str().unwrap();
     let mut header = String::new();
     header.push_str(":");
     header.push_str(file_name);//filename
     header.push_str(":");
-    header.push_str(format!("{:x}", path_metadata.len()).as_str());//filesize//
+    header.push_str(format!("{:x}", file_size).as_str());//filesize//
     header.push_str(":");
     header.push_str(format!("{:x}", file_attr).as_str());//fileattr
     let timestamp_now = Local::now().timestamp();

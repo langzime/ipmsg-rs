@@ -3,6 +3,6 @@ extern crate raudient;
 
 use raudient::app;
 
-fn main() {
-    app::run();
+fn main() -> glib::ExitCode {
+    app::run()
 }

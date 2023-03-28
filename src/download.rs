@@ -128,75 +128,44 @@ pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, r_file: R
     if file_type == IPMSG_FILE_REGULAR {
         let mut file_location = path.to_path_buf();
         file_location.push(r_file.name);
-        //let mut file = File::create(&file_location)?;
         let file_size = r_file.size;
         let mut buffer = BufReader::new(stream);
         read_bytes_to_file(&mut buffer, file_size, &file_location);
     }else if file_type == IPMSG_FILE_DIR {
-        let mut base_file_location = path.to_path_buf();
+        let mut next_path = path.to_path_buf();
         let mut buffer = BufReader::new(stream);
-        let mut path_infos = PathInfos{
-            inner: buffer,
-            next_path: base_file_location,
-        };
-        for path_info in path_infos {
+        while let Ok(Some(header_size_str)) = read_delimiter(&mut buffer) {
+            let header_size = u64::from_str_radix(&header_size_str, 16).unwrap();
+            info!("header_size {:?}", header_size);
+            let header_context_str = read_bytes(&mut buffer, (header_size - 1 - header_size_str.as_bytes().len() as u64));//-1是减去的那个冒号
+            let v: Vec<&str> = header_context_str.splitn(4, |c| c == ':').collect();
+            let file_name = v[0];
+            let file_size = u64::from_str_radix(v[1], 16).unwrap();
+            let file_attr = u32::from_str_radix(v[2], 16).unwrap();
+            let opt = constant::get_opt(file_attr);
+            let cmd = constant::get_mode(file_attr);
+            info!("header context {:?}", v);
+            if cmd == IPMSG_FILE_DIR {
+                next_path.push(file_name);
+                if !next_path.exists() {
+                    fs::create_dir(&next_path).unwrap();
+                }
+                info!("crate dir{:?}", next_path);
+            }else if cmd == IPMSG_FILE_REGULAR {
+                next_path.push(file_name);
+                info!("crate file{:?}", next_path);
+                read_bytes_to_file(&mut buffer, file_size, &next_path);
+                next_path.pop();
+            }else if cmd == IPMSG_FILE_RETPARENT  {
+                next_path.pop();
+                info!("back to parent {:?}", next_path);
+            }else {
 
+            }
         }
     }
     info!("download end!");
     Ok(())
-}
-
-#[derive(Debug)]
-pub struct PathInfos {
-    inner: BufReader<TcpStream>,
-    next_path: PathBuf,
-}
-
-impl Iterator for PathInfos {
-    type Item = Result<(), DownLoadError>;
-
-    fn next(&mut self) -> Option<Result<(), DownLoadError>> {
-        let ref mut stream = self.inner;
-        let ref mut next_path = self.next_path.clone();
-        match read_delimiter(stream) {
-            Ok(option)  => match option {
-                Some(header_size_str) => {
-                    let header_size = u64::from_str_radix(&header_size_str, 16).unwrap();
-                    info!("header_size {:?}", header_size);
-                    let header_context_str = read_bytes(stream, (header_size - 1 - header_size_str.as_bytes().len() as u64));//-1是减去的那个冒号
-                    let v: Vec<&str> = header_context_str.splitn(4, |c| c == ':').collect();
-                    let file_name = v[0];
-                    let file_size = u64::from_str_radix(v[1], 16).unwrap();
-                    let file_attr = u32::from_str_radix(v[2], 16).unwrap();
-                    let opt = constant::get_opt(file_attr);
-                    let cmd = constant::get_mode(file_attr);
-                    info!("header context {:?}", v);
-                    if cmd == IPMSG_FILE_DIR {
-                        next_path.push(file_name);
-                        if !next_path.exists() {
-                            fs::create_dir(&next_path).unwrap();
-                        }
-                        info!("crate dir{:?}", next_path);
-                    }else if cmd == IPMSG_FILE_REGULAR {
-                        next_path.push(file_name);
-                        info!("crate file{:?}", next_path);
-                        read_bytes_to_file(stream, file_size, &next_path);
-                        next_path.pop();
-                    }else if cmd == IPMSG_FILE_RETPARENT  {
-                        next_path.pop();
-                        info!("back to parent {:?}", next_path);
-                    }else {
-
-                    }
-                    self.next_path = next_path.to_path_buf();
-                    Some(Ok(()))
-                },
-                None => None,
-            },
-            Err(x) => Some(Err(x)),
-        }
-    }
 }
 
 fn read_delimiter(mut stream : & mut BufReader<TcpStream>) -> Result<Option<String>, DownLoadError> {
@@ -234,8 +203,9 @@ fn read_bytes_to_file(mut stream : & mut BufReader<TcpStream>, len: u64, file_pa
 
 ///
 /// unkown filesize can use follow
+/// 可以不需要文件长度的读
 ///
-fn read_bytes_to_file_unsize(mut stream : & mut BufReader<TcpStream>, len: u64, file_path: &PathBuf) {
+fn read_bytes_to_file_unsize(mut stream : & mut BufReader<TcpStream>, file_path: &PathBuf) {
     let mut file: File = File::create(file_path).unwrap();
     loop {
         let mut buffer = [0; 2048];
