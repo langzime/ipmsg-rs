@@ -78,9 +78,9 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
         let context :&str = &text_view_presend.buffer().text(&start_iter, &end_iter, false);
         let (packet, share_file) = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), host_ip.clone());
         model_sender.send(ModelEvent::SendOneMsg {to_ip: host_ip.clone(), packet, context: context.to_owned(), files: share_file}).unwrap();
-        (*files_send_clone.borrow_mut()).clear();
+        files_send_clone.borrow_mut().clear();
         pre_send_files_model.clear();
-        &text_view_presend.buffer().set_text("");
+        text_view_presend.buffer().set_text("");
     }));
 
     let chat_window_open_save = chat_window.clone();
@@ -124,7 +124,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     }));
 
     btn_clear.connect_clicked(clone!(@strong text_view_presend => move|_|{
-        &text_view_presend.buffer().set_text("");
+        text_view_presend.buffer().set_text("");
     }));
 
     let chat_window_open_file = chat_window.clone();

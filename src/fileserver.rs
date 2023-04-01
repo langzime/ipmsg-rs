@@ -134,20 +134,20 @@ pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
     debug!("{:?}", make_header(&root_path, false));
     if root_path.is_dir() {
         for sub_path in fs::read_dir(root_path).unwrap() {
-            let sub = &sub_path.unwrap().path();
+            let sub = sub_path.unwrap().path();
             if sub.is_file() {
-                let header = make_header(sub, false);
+                let header = make_header(&sub, false);
                 buffer.write(util::utf8_to_gb18030(&header).as_slice()).unwrap();
                 info!("{:?}", header);
                 let mut buf = [0; 1024];
-                let mut f: File = File::open(sub).unwrap();
+                let mut f: File = File::open(&sub).unwrap();
                 while let Ok(bytes_read) = f.read(&mut buf) {
                     if bytes_read == 0 { break; }
                     buffer.write(&buf[..bytes_read]).unwrap();
                     buffer.flush().unwrap();
                 }
             }else {
-                send_dir(sub, &mut buffer);
+                send_dir(&sub, &mut buffer);
             }
         }
     }

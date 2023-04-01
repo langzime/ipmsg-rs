@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::fmt::{self, Display};
 use std::error::Error;
-use std::fs::{self, File, Metadata, ReadDir};
+use std::fs::{self, File, ReadDir};
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
@@ -67,7 +67,7 @@ impl ManagerPool {
         {
             let mut lock = p1.file_pool.lock().unwrap();
             let sender = p1.model_sender;
-            let file = (*lock).get(&file_info.file_id);
+            let file = lock.get(&file_info.file_id);
             if let Some(p_file) = file {
                 if p_file.status == 1 {
                     //下载中
@@ -75,7 +75,7 @@ impl ManagerPool {
                     return;
                 }
             }else {
-                (*lock).insert(file_info.file_id, PoolFile { status: 1, file_info: file_info.clone() });
+                lock.insert(file_info.file_id, PoolFile { status: 1, file_info: file_info.clone() });
             }
         }
         let p2 = self.clone();
@@ -85,15 +85,15 @@ impl ManagerPool {
             {
                 let sender = p2.model_sender;
                 let mut lock = p2.file_pool.lock().unwrap();
-                let mut file = (*lock).get(&file_info.file_id);
+                let mut file = lock.get(&file_info.file_id);
                 if let Some(p_file) = file.take() {
                     if is_ok {
-                        (*lock).remove(&file_info.file_id);
+                        lock.remove(&file_info.file_id);
                         sender.send(ModelEvent::RemoveDownloadTaskInPool{ packet_id: file_info.packet_id, file_id: file_info.file_id, download_ip });
                     }else{
                         let mut tmp_file = p_file.clone();
                         tmp_file.status = 0;
-                        (*lock).insert(tmp_file.file_info.file_id, tmp_file);
+                        lock.insert(tmp_file.file_info.file_id, tmp_file);
                     }
 
                 }
@@ -120,19 +120,17 @@ pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, r_file: R
     info!("start download file");
     let file_type = r_file.attr as u32;
     let mut stream = TcpStream::connect(addr)?;
-    let path: &Path = to_path.as_ref();
-    let metadata: Metadata = fs::metadata(path)?;
     let packet = Packet::new(IPMSG_SENDMSG| if file_type == IPMSG_FILE_DIR { IPMSG_GETDIRFILES } else { IPMSG_GETFILEDATA }, Some(format!("{:x}:{:x}:0:\u{0}", r_file.packet_id, r_file.file_id)));
     stream.write(packet.to_string().as_bytes())?;
     debug!("filetype {}", file_type);
     if file_type == IPMSG_FILE_REGULAR {
-        let mut file_location = path.to_path_buf();
+        let mut file_location = to_path.as_ref().to_path_buf();
         file_location.push(r_file.name);
         let file_size = r_file.size;
         let mut buffer = BufReader::new(stream);
         read_bytes_to_file(&mut buffer, file_size, &file_location);
     }else if file_type == IPMSG_FILE_DIR {
-        let mut next_path = path.to_path_buf();
+        let mut next_path = to_path.as_ref().to_path_buf();
         let mut buffer = BufReader::new(stream);
         while let Ok(Some(header_size_str)) = read_delimiter(&mut buffer) {
             let header_size = u64::from_str_radix(&header_size_str, 16).unwrap();

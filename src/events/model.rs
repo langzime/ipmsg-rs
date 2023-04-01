@@ -152,7 +152,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                     {
                         let mut file_pool = file_server.file_pool.lock().unwrap();
                         if let Some(file) = files {
-                            (*file_pool).push(file);
+                            file_pool.push(file);
                         }
 
                     }
@@ -205,7 +205,7 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
         let user_name = if ext_vec.len() > 1&& !ext_vec[0].is_empty() {
             ext_vec[0].to_owned()
         }else {
-            (&packet).sender_name.to_owned()
+            packet.sender_name.clone()
         };
 
         let user = User::new(user_name, (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), group_name);

@@ -14,7 +14,7 @@ use gtk::prelude::*;
 use gtk::{
     self, CellRendererText, CellRendererProgress, AboutDialog, IconSize, Image, Label, Window,
     ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    Widget, TextView, Fixed, ScrolledWindow, ListBox, ListBoxRow, Application
+    Widget, TextView, Fixed, ScrolledWindow, ListBox, ListBoxRow, Application,
 };
 use gdk_pixbuf::Pixbuf;
 use glib::{Receiver, MainContext};
@@ -25,12 +25,9 @@ use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, R
 use crate::chat_window::ChatWindow;
 use crate::events::{ui::UiEvent, model::ModelEvent, model::model_run};
 
-pub struct MainWindow {
-
-}
+pub struct MainWindow {}
 
 impl MainWindow {
-
     pub fn new(application: &Application) -> MainWindow {
         let (tx, rx): (glib::Sender<UiEvent>, glib::Receiver<UiEvent>) = MainContext::channel::<UiEvent>(glib::PRIORITY_HIGH);
         let (model_sender, model_receiver): (crossbeam_channel::Sender<ModelEvent>, crossbeam_channel::Receiver<ModelEvent>) = unbounded();
@@ -100,42 +97,41 @@ impl MainWindow {
         model_sender.clone().send(ModelEvent::UserListSelected(String::from("未选择"))).unwrap();
 
         tree.connect_cursor_changed(clone!(@strong model_sender => move |tree_view| {
-        let selection = tree_view.selection();
-        if let Some((model, iter)) = selection.selected() {
-            let str1 = model.get_value(&iter, 0).get::<String>().unwrap();
-            model_sender.send(ModelEvent::UserListSelected(str1)).unwrap();
-        }
-    }));
+            let selection = tree_view.selection();
+            if let Some((model, iter)) = selection.selected() {
+                let str1 = model.get_value(&iter, 0).get::<String>().unwrap();
+                model_sender.send(ModelEvent::UserListSelected(str1)).unwrap();
+            }
+        }));
 
         let mut chat_windows: HashMap<String, ChatWindow> = HashMap::new();
 
         tree.connect_row_activated(clone!(@strong model_sender => move |tree_view, tree_path, tree_view_column| {
-        let selection = tree_view.selection();
-        if let Some((model, iter)) = selection.selected() {
-            let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
-            let name = model.get_value(&iter, 0).get::<String>().unwrap();
-            model_sender.send(ModelEvent::UserListDoubleClicked{name, ip: ip_str }).unwrap();
-        }
-    }));
+            let selection = tree_view.selection();
+            if let Some((model, iter)) = selection.selected() {
+                let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
+                let name = model.get_value(&iter, 0).get::<String>().unwrap();
+                model_sender.send(ModelEvent::UserListDoubleClicked{name, ip: ip_str }).unwrap();
+            }
+        }));
 
         let socket: UdpSocket = match UdpSocket::bind(crate::constant::ADDR.as_str()) {
             Ok(s) => {
                 info!("udp server start listening! {:?}", crate::constant::ADDR.as_str());
                 s
-            },
+            }
             Err(e) => panic!("couldn't bind socket: {}", e)
         };
 
-        model_run(socket.try_clone().unwrap(), model_receiver, model_sender.clone(),tx);
+        model_run(socket.try_clone().unwrap(), model_receiver, model_sender.clone(), tx);
 
         let main_context = MainContext::default();
         main_context.acquire();
         rx.attach(Some(&main_context), move |event| {
             match event {
-                UiEvent::OpenOrReOpenChatWindow {name, ip} => {
-                    match &chat_windows.get(&ip) {
-                        Some(win) => {
-                        }
+                UiEvent::OpenOrReOpenChatWindow { name, ip } => {
+                    match chat_windows.get(&ip) {
+                        Some(win) => {}
                         None => {
                             let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone());
                             chat_windows.insert(ip.clone(), chat_win);
@@ -146,21 +142,21 @@ impl MainWindow {
                     label.set_text(&format!("-- {} --", text));
                 }
                 UiEvent::UserListRemoveOne(ip) => {
-                    if let Some(first) = model.iter_first(){//拿出来第一条
-                        let mut num :u32 = model.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                    if let Some(first) = model.iter_first() {//拿出来第一条
+                        let mut num: u32 = model.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
                         let ip1 = model.get_value(&first, 3).get::<String>().unwrap();//获取ip
                         if ip == ip1 {
                             model.remove(&first);
-                        }else {
+                        } else {
                             loop {
                                 num = num + 1;
-                                if let Some(next_iter) = model.iter_from_string(&num.to_string()){
+                                if let Some(next_iter) = model.iter_from_string(&num.to_string()) {
                                     let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
                                     if next_ip == ip1 {
                                         model.remove(&next_iter);
                                         break;
                                     }
-                                }else{
+                                } else {
                                     break;
                                 }
                             }
@@ -169,21 +165,21 @@ impl MainWindow {
                 }
                 UiEvent::UserListAddOne(income_user) => {
                     let mut in_flag = false;
-                    if let Some(first) = model.iter_first(){//拿出来第一条
-                        let mut num :u32 = model.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                    if let Some(first) = model.iter_first() {//拿出来第一条
+                        let mut num: u32 = model.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
                         let ip = model.get_value(&first, 3).get::<String>().unwrap();//获取ip
                         if ip == income_user.ip {
                             in_flag = true;
-                        }else {
+                        } else {
                             loop {
                                 num = num + 1;
-                                if let Some(next_iter) = model.iter_from_string(&num.to_string()){
+                                if let Some(next_iter) = model.iter_from_string(&num.to_string()) {
                                     let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
                                     if next_ip == income_user.ip {
                                         in_flag = true;
                                         break;
                                     }
-                                }else{
+                                } else {
                                     break;
                                 }
                             }
@@ -195,16 +191,15 @@ impl MainWindow {
                     }
                 }
                 UiEvent::CloseChatWindow(ip) => {
-                    match &chat_windows.get(&ip) {
+                    match chat_windows.get(&ip) {
                         Some(win) => {
                             chat_windows.remove(&ip);
                         }
-                        None => {
-                        }
+                        None => {}
                     }
                 }
-                UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet} => {
-                    match &chat_windows.get(&ip) {
+                UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet } => {
+                    match chat_windows.get(&ip) {
                         Some(win) => {
                             //&window.set_focus(Some(v_box));
                             //win.win.show();
@@ -215,18 +210,17 @@ impl MainWindow {
                         }
                     }
                 }
-                UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files} => {
-                    match &chat_windows.get(&to_ip) {
+                UiEvent::DisplaySelfSendMsgInHis { to_ip, context, files } => {
+                    match chat_windows.get(&to_ip) {
                         Some(win) => {
                             let (his_start_iter, mut his_end_iter) = win.his_view.buffer().bounds();
                             win.his_view.buffer().insert(&mut his_end_iter, format!("{}:{}\n", "我", context).as_str());
-
                         }
                         None => {}
                     }
                 }
-                UiEvent::DisplayReceivedMsgInHis{ from_ip, name, context, files } => {
-                    match &chat_windows.get(&from_ip) {
+                UiEvent::DisplayReceivedMsgInHis { from_ip, name, context, files } => {
+                    match chat_windows.get(&from_ip) {
                         Some(win) => {
                             let (his_start_iter, mut his_end_iter) = win.his_view.buffer().bounds();
                             win.his_view.buffer().insert(&mut his_end_iter, format!("{}:{}\n", name, context).as_str());
@@ -239,27 +233,27 @@ impl MainWindow {
                         None => {}
                     }
                 }
-                UiEvent::RemoveInReceivedList{packet_id, file_id, download_ip } => {
-                    match &chat_windows.get(&download_ip) {
+                UiEvent::RemoveInReceivedList { packet_id, file_id, download_ip } => {
+                    match chat_windows.get(&download_ip) {
                         Some(win) => {
                             let pre_receive_file_store = &win.received_store;
-                            if let Some(first) = pre_receive_file_store.iter_first(){
-                                let mut num :u32 = pre_receive_file_store.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
+                            if let Some(first) = pre_receive_file_store.iter_first() {
+                                let mut num: u32 = pre_receive_file_store.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
                                 let received_file_id = pre_receive_file_store.get_value(&first, 1).get::<u32>().unwrap();
                                 let received_packet_id = pre_receive_file_store.get_value(&first, 2).get::<u32>().unwrap();
-                                if file_id == received_file_id&&packet_id == received_packet_id {
+                                if file_id == received_file_id && packet_id == received_packet_id {
                                     pre_receive_file_store.remove(&first);
-                                }else {
+                                } else {
                                     loop {
                                         num = num + 1;
-                                        if let Some(next_iter) = pre_receive_file_store.iter_from_string(&num.to_string()){
+                                        if let Some(next_iter) = pre_receive_file_store.iter_from_string(&num.to_string()) {
                                             let next_file_id = pre_receive_file_store.get_value(&next_iter, 1).get::<u32>().unwrap();
                                             let next_packet_id = pre_receive_file_store.get_value(&next_iter, 2).get::<u32>().unwrap();
-                                            if next_file_id == file_id&&next_packet_id == packet_id {
+                                            if next_file_id == file_id && next_packet_id == packet_id {
                                                 pre_receive_file_store.remove(&next_iter);
                                                 break;
                                             }
-                                        }else{
+                                        } else {
                                             break;
                                         }
                                     }
@@ -278,7 +272,7 @@ impl MainWindow {
 
         window.set_child(Some(&v_box));
         window.present();
-        MainWindow{}
+        MainWindow {}
     }
 }
 
