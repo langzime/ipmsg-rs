@@ -24,13 +24,14 @@ use glib::clone;
 use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner, ErrMsg};
 use crate::chat_window::ChatWindow;
 use crate::events::{ui::UiEvent, model::ModelEvent, model::model_run};
+use crate::GLOBLE_SENDER;
 
 pub struct MainWindow {}
 
 impl MainWindow {
     pub fn new(application: &Application) -> MainWindow {
         let (tx, rx): (glib::Sender<UiEvent>, glib::Receiver<UiEvent>) = MainContext::channel::<UiEvent>(glib::PRIORITY_HIGH);
-        let (model_sender, model_receiver): (crossbeam_channel::Sender<ModelEvent>, crossbeam_channel::Receiver<ModelEvent>) = unbounded();
+        // let (model_sender, model_receiver): (crossbeam_channel::Sender<ModelEvent>, crossbeam_channel::Receiver<ModelEvent>) = unbounded();
 
         let window = gtk::ApplicationWindow::new(application);
         window.set_title(Some("飞鸽传书"));
@@ -94,26 +95,26 @@ impl MainWindow {
         // v_box.add(&menu_bar);
         v_box.append(&scrolled);
         v_box.append(&label);
-        model_sender.clone().send(ModelEvent::UserListSelected(String::from("未选择"))).unwrap();
+        GLOBLE_SENDER.send(ModelEvent::UserListSelected(String::from("未选择"))).unwrap();
 
-        tree.connect_cursor_changed(clone!(@strong model_sender => move |tree_view| {
+        tree.connect_cursor_changed( move |tree_view| {
             let selection = tree_view.selection();
             if let Some((model, iter)) = selection.selected() {
                 let str1 = model.get_value(&iter, 0).get::<String>().unwrap();
-                model_sender.send(ModelEvent::UserListSelected(str1)).unwrap();
+                GLOBLE_SENDER.send(ModelEvent::UserListSelected(str1)).unwrap();
             }
-        }));
+        });
 
         let mut chat_windows: HashMap<String, ChatWindow> = HashMap::new();
 
-        tree.connect_row_activated(clone!(@strong model_sender => move |tree_view, tree_path, tree_view_column| {
+        tree.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
             let selection = tree_view.selection();
             if let Some((model, iter)) = selection.selected() {
                 let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
                 let name = model.get_value(&iter, 0).get::<String>().unwrap();
-                model_sender.send(ModelEvent::UserListDoubleClicked{name, ip: ip_str }).unwrap();
+                GLOBLE_SENDER.send(ModelEvent::UserListDoubleClicked{name, ip: ip_str }).unwrap();
             }
-        }));
+        });
 
         let socket: UdpSocket = match UdpSocket::bind(crate::constant::ADDR.as_str()) {
             Ok(s) => {
@@ -123,7 +124,7 @@ impl MainWindow {
             Err(e) => panic!("couldn't bind socket: {}", e)
         };
 
-        model_run(socket.try_clone().unwrap(), model_receiver, model_sender.clone(), tx);
+        model_run(socket.try_clone().unwrap(),  tx);
 
         let main_context = MainContext::default();
         main_context.acquire();
@@ -133,7 +134,7 @@ impl MainWindow {
                     match chat_windows.get(&ip) {
                         Some(win) => {}
                         None => {
-                            let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone());
+                            let chat_win = crate::chat_window::create_chat_window(name, ip.clone());
                             chat_windows.insert(ip.clone(), chat_win);
                         }
                     }
@@ -205,7 +206,7 @@ impl MainWindow {
                             //win.win.show();
                         }
                         None => {
-                            let chat_win = crate::chat_window::create_chat_window(model_sender.clone(), name, ip.clone());
+                            let chat_win = crate::chat_window::create_chat_window( name, ip.clone());
                             chat_windows.insert(ip.clone(), chat_win);
                         }
                     }

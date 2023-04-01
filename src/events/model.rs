@@ -13,6 +13,7 @@ use crate::download::{PoolFile, ManagerPool};
 use crate::fileserver::FileServer;
 use crate::events::ui::UiEvent;
 use crate::constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_LIMITED_BROADCAST};
+use crate::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::util::packet_parser;
 
 pub enum ModelEvent {
@@ -33,7 +34,7 @@ pub enum ModelEvent {
     RemoveDownloadTaskInPool { packet_id: u32, file_id: u32, download_ip: String},
 }
 
-pub fn model_run(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelEvent>, model_event_sender: crossbeam_channel::Sender<ModelEvent>, ui_event_sender: glib::Sender<UiEvent>) {
+pub fn model_run(socket: UdpSocket, ui_event_sender: glib::Sender<UiEvent>) {
 
     let file_pool: Arc<Mutex<Vec<ShareInfo>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -43,21 +44,21 @@ pub fn model_run(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelE
 
     let download_pool: Arc<Mutex<HashMap<u32, PoolFile>>> = Arc::new(Mutex::new(HashMap::new()));
 
-    let manager_pool = ManagerPool::new(download_pool, model_event_sender.clone());
+    let manager_pool = ManagerPool::new(download_pool);
 
-    model_event_loop(socket.try_clone().unwrap(), receiver, model_event_sender.clone(), ui_event_sender, file_server, manager_pool);
+    model_event_loop(socket.try_clone().unwrap(), ui_event_sender, file_server, manager_pool);
 
-    start_daemon(socket.try_clone().unwrap(), model_event_sender.clone());
+    start_daemon(socket.try_clone().unwrap());
 
-    send_ipmsg_br_entry(model_event_sender.clone());
+    send_ipmsg_br_entry();
 }
 
-pub fn send_ipmsg_br_entry(model_event_sender: crossbeam_channel::Sender<ModelEvent>) {
+pub fn send_ipmsg_br_entry() {
     let packet = Packet::new(IPMSG_BR_ENTRY|IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *constant::HOST_NAME, *constant::HOST_NAME)));
-    model_event_sender.send(ModelEvent::BroadcastEntry(packet)).unwrap();
+    GLOBLE_SENDER.send(ModelEvent::BroadcastEntry(packet)).unwrap();
 }
 
-pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEvent>){
+pub fn start_daemon(socket: UdpSocket){
     let socket_clone = socket.try_clone().unwrap();
     thread::spawn(move||{
         loop {
@@ -71,7 +72,7 @@ pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEv
                     match result {
                         Ok((mut packet, _)) => {
                             packet.ip = src.ip().to_string();
-                            sender.send(ModelEvent::ReceivedPacket {packet}).unwrap();
+                            GLOBLE_SENDER.send(ModelEvent::ReceivedPacket {packet}).unwrap();
                         }
                         Err(_) => {
                             error!("Invalid packet {} !", receive_str);
@@ -86,13 +87,13 @@ pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEv
     });
 }
 
-fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelEvent>, model_event_sender: crossbeam_channel::Sender<ModelEvent>, ui_event_sender: glib::Sender<UiEvent>, file_server: FileServer, manager_pool: ManagerPool) {
+fn model_event_loop(socket: UdpSocket, ui_event_sender: glib::Sender<UiEvent>, file_server: FileServer, manager_pool: ManagerPool) {
     let socket_clone = socket.try_clone().unwrap();
     thread::spawn(move || {
-        while let Ok(ev) = receiver.recv() {
+        while let Ok(ev) = GLOBLE_RECEIVER.recv() {
             match ev {
                 ModelEvent::ReceivedPacket {packet} => {
-                    model_packet_dispatcher(packet, model_event_sender.clone());
+                    model_packet_dispatcher(packet);
                 }
                 ModelEvent::UserListSelected(text) => {
                     ui_event_sender.send(UiEvent::UpdateUserListFooterStatus(text)).unwrap();
@@ -179,7 +180,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
 
 }
 
-fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel::Sender<ModelEvent>) {
+fn model_packet_dispatcher(packet: Packet) {
     let mut extstr = String::new();
     if let Some(ref additional_section) = (&packet).additional_section {
         extstr = additional_section.to_owned();
@@ -188,10 +189,10 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
     let cmd = constant::get_mode((&packet).command_no);
     if opt&constant::IPMSG_SENDCHECKOPT != 0 {
         let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some((&packet).packet_no.to_string()));
-        model_event_sender.send(ModelEvent::RecMsgReply{packet: recvmsg, from_ip: (&packet).ip.to_owned()});
+        GLOBLE_SENDER.send(ModelEvent::RecMsgReply{packet: recvmsg, from_ip: (&packet).ip.to_owned()});
     }
     if cmd == constant::IPMSG_BR_EXIT {//收到下线通知消息
-        model_event_sender.send(ModelEvent::BroadcastExit((&packet).sender_host.to_owned()));
+        GLOBLE_SENDER.send(ModelEvent::BroadcastExit((&packet).sender_host.to_owned()));
     }else if cmd == constant::IPMSG_BR_ENTRY {//收到上线通知消息
         ///扩展段 用户名|用户组
         let ext_vec = extstr.splitn(2, |c| c == ':').collect::<Vec<&str>>();
@@ -210,10 +211,10 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
 
         let user = User::new(user_name, (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), group_name);
         info!("{user:?}");
-        model_event_sender.send(ModelEvent::RecOnlineMsgReply{packet: ansentry_packet, from_user: user});
+        GLOBLE_SENDER.send(ModelEvent::RecOnlineMsgReply{packet: ansentry_packet, from_user: user});
     }else if cmd == constant::IPMSG_ANSENTRY {//通报新上线
         let user = User::new((&packet).sender_name.to_owned(), (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), "".to_owned());
-        model_event_sender.send(ModelEvent::NotifyOnline{user});
+        GLOBLE_SENDER.send(ModelEvent::NotifyOnline{user});
     }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
         //文字消息|文件扩展段
         let ext_vec = extstr.split('\0').collect::<Vec<&str>>();
@@ -267,7 +268,7 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
         }
         let packet_clone = packet.clone();
         let received_packet_inner = ReceivedPacketInner::new((&packet).ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
-        model_event_sender.send(ModelEvent::ReceivedMsg {msg: received_packet_inner}).unwrap();
+        GLOBLE_SENDER.send(ModelEvent::ReceivedMsg {msg: received_packet_inner}).unwrap();
     }else if cmd == constant::IPMSG_NOOPERATION {
         info!("i am IPMSG_NOOPERATION");
     }else if cmd == constant::IPMSG_BR_ABSENCE {

@@ -1119,6 +1119,7 @@ dependencies = [
  "log",
  "once_cell",
  "pango",
+ "thiserror",
 ]
 
 [[package]]
