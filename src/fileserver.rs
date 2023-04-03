@@ -12,7 +12,7 @@ use log::{info, trace, warn, debug};
 use combine::parser::Parser;
 use crate::model::{FileInfo, Packet, ShareInfo};
 use crate::{constant, util};
-use crate::constant::REPARENT_PATH;
+use crate::constant::{IPMSG_PACKET_DELIMITER, REPARENT_PATH};
 use crate::util::packet_parser;
 
 #[derive(Clone, Debug)]
@@ -162,26 +162,30 @@ pub fn make_header(path: &PathBuf, ret_parent: bool) -> String {
     let file_name;
     let file_attr;
     let file_size;
+    let mut header = String::new();
+    header.push(IPMSG_PACKET_DELIMITER);
     if ret_parent {
         file_attr = constant::IPMSG_FILE_RETPARENT;
-        file_name = REPARENT_PATH;
+        let tmp_file_name = format!("{}", REPARENT_PATH);
+        header.push_str(tmp_file_name.as_str());//filename
         file_size = 0;
     }else{
         let path_metadata: Metadata = fs::metadata(&path).unwrap();
         file_size = path_metadata.len();
+        file_name = path.file_name().unwrap().to_str().unwrap();
+        header.push_str(file_name);
         if path_metadata.is_dir() {
             file_attr = constant::IPMSG_FILE_DIR;
         } else {
             file_attr = constant::IPMSG_FILE_REGULAR;
         }
+        path_metadata.created();
+        path_metadata.modified();
     }
-    let file_name: &str = &path.file_name().unwrap().to_str().unwrap();
-    let mut header = String::new();
-    header.push_str(":");
-    header.push_str(file_name);//filename
-    header.push_str(":");
+
+    header.push(IPMSG_PACKET_DELIMITER);
     header.push_str(format!("{:x}", file_size).as_str());//filesize//
-    header.push_str(":");
+    header.push(IPMSG_PACKET_DELIMITER);
     header.push_str(format!("{:x}", file_attr).as_str());//fileattr
     let timestamp_now = Local::now().timestamp();
     header.push_str(format!(":{:x}={:x}:{:x}={:x}:", constant::IPMSG_FILE_CREATETIME, timestamp_now, constant::IPMSG_FILE_MTIME, timestamp_now).as_str());//

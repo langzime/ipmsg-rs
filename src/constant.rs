@@ -142,7 +142,10 @@ pub fn get_opt(command: u32) -> u32 {
 }
 
 ///以下为程序部分
-pub const REPARENT_PATH: &'static str = ".";
+pub const REPARENT_PATH: char = '.';
+
+//报文分隔符
+pub const IPMSG_PACKET_DELIMITER: char = ':';
 
 use ::hostname as host_name;
 

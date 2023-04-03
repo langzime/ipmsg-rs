@@ -13,7 +13,7 @@ use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use log::{info, trace, warn, debug};
 use anyhow::{Result, anyhow};
-use crate::constant::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT};
+use crate::constant::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT, IPMSG_PACKET_DELIMITER};
 use crate::events::model::ModelEvent;
 use crate::GLOBLE_SENDER;
 use crate::model::Packet;
@@ -128,7 +128,7 @@ pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, r_file: R
 
 fn read_delimiter(mut stream : & mut BufReader<TcpStream>) -> Result<Option<String>> {
     let mut s_buffer = Vec::new();
-    let len = stream.read_until(b':', &mut s_buffer)?;
+    let len = stream.read_until(u8::try_from(IPMSG_PACKET_DELIMITER)?, &mut s_buffer)?;
     if len != 0usize {
         if len > 200 {
             return Err(anyhow!("read_delimiter error!"));
