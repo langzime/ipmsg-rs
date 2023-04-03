@@ -10,9 +10,9 @@ use encoding::all::GB18030;
 use chrono::prelude::*;
 use log::{info, trace, warn, debug};
 use combine::parser::Parser;
-use crate::model::{FileInfo, Packet, ShareInfo};
-use crate::{constant, util};
-use crate::constant::{IPMSG_PACKET_DELIMITER, REPARENT_PATH};
+use crate::models::model::{FileInfo, Packet, ShareInfo};
+use crate::{constants::protocol, util};
+use crate::constants::protocol::{IPMSG_PACKET_DELIMITER, REPARENT_PATH};
 use crate::util::packet_parser;
 
 #[derive(Clone, Debug)]
@@ -31,9 +31,9 @@ impl FileServer {
     pub fn run(&self) {
         let pool_tmp = self.file_pool.clone();
         thread::spawn(move || {
-            let tcp_listener: TcpListener = TcpListener::bind(constant::ADDR.as_str()).unwrap();
+            let tcp_listener: TcpListener = TcpListener::bind(protocol::ADDR.as_str()).unwrap();
             let pool_tmp = pool_tmp.clone();
-            info!("tcp server start listening! {:?}", constant::ADDR.as_str());
+            info!("tcp server start listening! {:?}", protocol::ADDR.as_str());
             for stream in tcp_listener.incoming() {
                 let base_stream = stream.unwrap().try_clone().unwrap();
                 //let search_arc = search_arc_tmp.clone();
@@ -50,12 +50,12 @@ impl FileServer {
                     match result {
                         Ok((mut packet, _)) => {
                             packet.ip = src.ip().to_string();
-                            let cmd = constant::get_mode(packet.command_no);
+                            let cmd = protocol::get_mode(packet.command_no);
                             if packet.additional_section.is_some() {
-                                if cmd == constant::IPMSG_GETFILEDATA {
+                                if cmd == protocol::IPMSG_GETFILEDATA {
                                         //文件请求
                                     FileServer::process_file(&pool_tmp, &mut stream_echo, packet.additional_section.unwrap())
-                                }else if cmd == constant::IPMSG_GETDIRFILES {
+                                }else if cmd == protocol::IPMSG_GETDIRFILES {
                                     FileServer::process_dir(pool_tmp, stream_echo, packet.additional_section.unwrap())
                                 }else {
                                     info!("Invalid packet tcp file cmd {:?} !", tmp_str);
@@ -165,7 +165,7 @@ pub fn make_header(path: &PathBuf, ret_parent: bool) -> String {
     let mut header = String::new();
     header.push(IPMSG_PACKET_DELIMITER);
     if ret_parent {
-        file_attr = constant::IPMSG_FILE_RETPARENT;
+        file_attr = protocol::IPMSG_FILE_RETPARENT;
         let tmp_file_name = format!("{}", REPARENT_PATH);
         header.push_str(tmp_file_name.as_str());//filename
         file_size = 0;
@@ -175,9 +175,9 @@ pub fn make_header(path: &PathBuf, ret_parent: bool) -> String {
         file_name = path.file_name().unwrap().to_str().unwrap();
         header.push_str(file_name);
         if path_metadata.is_dir() {
-            file_attr = constant::IPMSG_FILE_DIR;
+            file_attr = protocol::IPMSG_FILE_DIR;
         } else {
-            file_attr = constant::IPMSG_FILE_REGULAR;
+            file_attr = protocol::IPMSG_FILE_REGULAR;
         }
         path_metadata.created();
         path_metadata.modified();
@@ -188,7 +188,7 @@ pub fn make_header(path: &PathBuf, ret_parent: bool) -> String {
     header.push(IPMSG_PACKET_DELIMITER);
     header.push_str(format!("{:x}", file_attr).as_str());//fileattr
     let timestamp_now = Local::now().timestamp();
-    header.push_str(format!(":{:x}={:x}:{:x}={:x}:", constant::IPMSG_FILE_CREATETIME, timestamp_now, constant::IPMSG_FILE_MTIME, timestamp_now).as_str());//
+    header.push_str(format!(":{:x}={:x}:{:x}={:x}:", protocol::IPMSG_FILE_CREATETIME, timestamp_now, protocol::IPMSG_FILE_MTIME, timestamp_now).as_str());//
     let mut length = util::utf8_to_gb18030(&header).len();
     length = length + format!("{:0>4x}", length).len();
     header.insert_str(0, format!("{:0>4x}", length).as_str());

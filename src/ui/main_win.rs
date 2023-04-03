@@ -6,25 +6,27 @@ use std::thread;
 use std::sync::mpsc;
 use std::collections::HashMap;
 use std::net::UdpSocket;
-use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs};
 use std::env::args;
 use human_panic::setup_panic;
 use gio::{ApplicationFlags, Menu, MenuItem};
 use gtk::prelude::*;
 use gtk::{
-    self, CellRendererText, CellRendererProgress, AboutDialog, IconSize, Image, Label, Window,
-    ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    Widget, TextView, Fixed, ScrolledWindow, ListBox, ListBoxRow, Application,
+    self, AboutDialog, Application, Builder, Button, CellRendererProgress, CellRendererText, Fixed,
+    Grid, IconSize, Image, Label, ListBox, ListBoxRow, ListStore,
+    Orientation, ScrolledWindow, TextView, TreeView, TreeViewColumn, Widget, Window,
 };
 use gdk_pixbuf::Pixbuf;
-use glib::{Receiver, MainContext};
+use glib::{MainContext, Receiver};
 use crossbeam_channel::unbounded;
-use log::{info, trace, warn, debug};
+use log::{debug, info, trace, warn};
 use glib::clone;
-use crate::model::{self, User, OperUser, Operate, ShareInfo, Packet, FileInfo, ReceivedSimpleFileInfo, ReceivedPacketInner, ErrMsg};
-use crate::chat_window::ChatWindow;
-use crate::events::{ui::UiEvent, model::ModelEvent, model::model_run};
-use crate::GLOBLE_SENDER;
+use crate::models::model::{self, ErrMsg, FileInfo, Operate, OperUser, Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
+use crate::ui::chat_window::ChatWindow;
+use crate::events::model::model_run;
+use crate::models::event::ModelEvent;
+use crate::core::GLOBLE_SENDER;
+use crate::models::event::UiEvent;
 
 pub struct MainWindow {}
 
@@ -116,9 +118,9 @@ impl MainWindow {
             }
         });
 
-        let socket: UdpSocket = match UdpSocket::bind(crate::constant::ADDR.as_str()) {
+        let socket: UdpSocket = match UdpSocket::bind(crate::constants::protocol::ADDR.as_str()) {
             Ok(s) => {
-                info!("udp server start listening! {:?}", crate::constant::ADDR.as_str());
+                info!("udp server start listening! {:?}", crate::constants::protocol::ADDR.as_str());
                 s
             }
             Err(e) => panic!("couldn't bind socket: {}", e)
@@ -134,7 +136,7 @@ impl MainWindow {
                     match chat_windows.get(&ip) {
                         Some(win) => {}
                         None => {
-                            let chat_win = crate::chat_window::create_chat_window(name, ip.clone());
+                            let chat_win = crate::ui::chat_window::create_chat_window(name, ip.clone());
                             chat_windows.insert(ip.clone(), chat_win);
                         }
                     }
@@ -206,7 +208,7 @@ impl MainWindow {
                             //win.win.show();
                         }
                         None => {
-                            let chat_win = crate::chat_window::create_chat_window( name, ip.clone());
+                            let chat_win = crate::ui::chat_window::create_chat_window(name, ip.clone());
                             chat_windows.insert(ip.clone(), chat_win);
                         }
                     }

@@ -13,11 +13,10 @@ use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use log::{info, trace, warn, debug};
 use anyhow::{Result, anyhow};
-use crate::constant::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT, IPMSG_PACKET_DELIMITER};
-use crate::events::model::ModelEvent;
-use crate::GLOBLE_SENDER;
-use crate::model::Packet;
-use crate::model::{FileInfo, ReceivedSimpleFileInfo};
+use crate::constants::protocol::{self, IPMSG_SENDMSG, IPMSG_GETFILEDATA, IPMSG_GETDIRFILES, IPMSG_FILE_DIR, IPMSG_FILE_REGULAR, IPMSG_FILE_RETPARENT, IPMSG_PACKET_DELIMITER};
+use crate::core::GLOBLE_SENDER;
+use crate::models::event::ModelEvent;
+use crate::models::model::{Packet, FileInfo, ReceivedSimpleFileInfo};
 
 #[derive(Clone, Debug)]
 pub struct ManagerPool {
@@ -47,7 +46,7 @@ impl ManagerPool {
         }
         let tmp = self.clone();
         thread::spawn(move || {
-            let download_url = format!("{}:{}", download_ip, constant::IPMSG_DEFAULT_PORT);
+            let download_url = format!("{}:{}", download_ip, protocol::IPMSG_DEFAULT_PORT);
             let is_ok = download(download_url, save_path, file_info.clone()).is_ok();
             {
                 let mut lock = tmp.file_pool.lock().unwrap();
@@ -100,8 +99,8 @@ pub fn download<A: ToSocketAddrs, S: AsRef<Path>>(addr: A, to_path: S, r_file: R
             let file_name = v[0];
             let file_size = u64::from_str_radix(v[1], 16)?;
             let file_attr = u32::from_str_radix(v[2], 16)?;
-            let opt = constant::get_opt(file_attr);
-            let cmd = constant::get_mode(file_attr);
+            let opt = protocol::get_opt(file_attr);
+            let cmd = protocol::get_mode(file_attr);
             info!("header context {:?}", v);
             if cmd == IPMSG_FILE_DIR {
                 next_path.push(file_name);

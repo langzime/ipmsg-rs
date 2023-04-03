@@ -6,8 +6,8 @@ use encoding::{Encoding, EncoderTrap, DecoderTrap};
 use encoding::all::GB18030;
 use chrono::prelude::*;
 use log::{info, trace, warn};
-use crate::model::{self, Packet};
-use crate::constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT};
+use crate::models::model::{self, Packet};
+use crate::constants::protocol::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT};
 
 pub fn create_sendmsg(context :String, files: Vec<model::FileInfo>, tar_ip: String) -> (Packet, Option<model::ShareInfo>){
     let commond = if files.len() > 0 { IPMSG_SENDMSG|IPMSG_FILEATTACHOPT } else { IPMSG_SENDMSG };//如果有文件，需要扩展文件

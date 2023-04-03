@@ -14,11 +14,11 @@ use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use log::{info, trace, warn};
 use glib::clone;
-use crate::GLOBLE_SENDER;
-use crate::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
-use crate::events::model::ModelEvent;
-use crate::message;
-use crate::constant;
+use crate::core::GLOBLE_SENDER;
+use crate::models::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
+use crate::models::event::ModelEvent;
+use crate::models::message;
+use crate::constants::protocol;
 //use crate::app::GLOBAL_CHATWINDOWS;
 
 // make moving clones into closures more convenient
@@ -148,9 +148,9 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S) -> ChatWindow {
                 let metadata: Metadata = fs::metadata(&filename).unwrap();
                 let size = metadata.len();
                 let attr = if metadata.is_file() {
-                    crate::constant::IPMSG_FILE_REGULAR
+                    crate::constants::protocol::IPMSG_FILE_REGULAR
                 }else if metadata.is_dir() {
-                    crate::constant::IPMSG_FILE_DIR
+                    crate::constants::protocol::IPMSG_FILE_DIR
                 }else {
                     panic!("oh no!");
                 };
@@ -197,9 +197,9 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S) -> ChatWindow {
                     let metadata: Metadata = fs::metadata(&filename).unwrap();
                     let size = metadata.len();
                     let attr = if metadata.is_file() {
-                        crate::constant::IPMSG_FILE_REGULAR
+                        crate::constants::protocol::IPMSG_FILE_REGULAR
                     }else if metadata.is_dir() {
-                        crate::constant::IPMSG_FILE_DIR
+                        crate::constants::protocol::IPMSG_FILE_DIR
                     }else {
                         panic!("oh no!");
                     };
