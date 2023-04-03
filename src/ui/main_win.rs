@@ -31,7 +31,7 @@ use crate::models::event::UiEvent;
 pub struct MainWindow {}
 
 impl MainWindow {
-    pub fn new(application: &Application) -> MainWindow {
+    pub fn new(application: &adw::Application) -> MainWindow {
         let (tx, rx): (glib::Sender<UiEvent>, glib::Receiver<UiEvent>) = MainContext::channel::<UiEvent>(glib::PRIORITY_HIGH);
         // let (model_sender, model_receiver): (crossbeam_channel::Sender<ModelEvent>, crossbeam_channel::Receiver<ModelEvent>) = unbounded();
 

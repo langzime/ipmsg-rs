@@ -121,8 +121,8 @@
         </child>
         <child>
           <object class="GtkImage">
-            <property name="icon_name">audio-x-generic</property>
-            <property name="icon_size">6</property>
+            <property name="icon_name">face-smile</property>
+            <property name="icon_size">2</property>
             <layout>
               <property name="column">2</property>
               <property name="row">0</property>
