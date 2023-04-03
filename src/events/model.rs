@@ -1,39 +1,22 @@
 use std::thread;
 use std::sync::{Arc, Mutex};
 use std::net::UdpSocket;
-use encoding::{Encoding, EncoderTrap, DecoderTrap};
+use encoding::{DecoderTrap, EncoderTrap, Encoding};
 use encoding::all::GB18030;
 use chrono::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use log::{info, trace, warn, debug, error};
+use log::{debug, error, info, trace, warn};
 use combine::parser::Parser;
-use crate::model::{Packet, User, ReceivedSimpleFileInfo, ReceivedPacketInner, FileInfo, ShareInfo};
-use crate::download::{PoolFile, ManagerPool};
-use crate::fileserver::FileServer;
-use crate::events::ui::UiEvent;
-use crate::constant::{self, IPMSG_SENDMSG, IPMSG_FILEATTACHOPT, IPMSG_DEFAULT_PORT, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_LIMITED_BROADCAST};
+use crate::models::model::{FileInfo, Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
+use crate::core::download::{ManagerPool, PoolFile};
+use crate::core::fileserver::FileServer;
+use crate::models::event::{ModelEvent, UiEvent};
+use crate::constants::protocol::{self, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_DEFAULT_PORT, IPMSG_FILEATTACHOPT, IPMSG_LIMITED_BROADCAST, IPMSG_SENDMSG};
+use crate::core::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::util::packet_parser;
 
-pub enum ModelEvent {
-    UserListSelected(String),
-    UserListDoubleClicked{ name: String, ip:String },
-    ReceivedPacket{ packet: Packet },
-    BroadcastEntry(Packet),
-    RecMsgReply{ packet: Packet, from_ip: String},
-    BroadcastExit(String),
-    RecOnlineMsgReply{ packet: Packet, from_user: User},
-    ClickChatWindowCloseBtn{from_ip: String},
-    NotifyOnline{ user: User},
-    ReceivedMsg{msg: ReceivedPacketInner},
-    SendOneMsg {to_ip: String, packet: Packet, context: String, files: Option<ShareInfo>},
-    PutInTcpFilePool(),
-    DownloadIsBusy { file: ReceivedSimpleFileInfo },
-    PutDownloadTaskInPool { file: ReceivedSimpleFileInfo, save_base_path: PathBuf, download_ip: String},
-    RemoveDownloadTaskInPool { packet_id: u32, file_id: u32, download_ip: String},
-}
-
-pub fn model_run(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelEvent>, model_event_sender: crossbeam_channel::Sender<ModelEvent>, ui_event_sender: glib::Sender<UiEvent>) {
+pub fn model_run(socket: UdpSocket, ui_event_sender: glib::Sender<UiEvent>) {
 
     let file_pool: Arc<Mutex<Vec<ShareInfo>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -43,21 +26,21 @@ pub fn model_run(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelE
 
     let download_pool: Arc<Mutex<HashMap<u32, PoolFile>>> = Arc::new(Mutex::new(HashMap::new()));
 
-    let manager_pool = ManagerPool::new(download_pool, model_event_sender.clone());
+    let manager_pool = ManagerPool::new(download_pool);
 
-    model_event_loop(socket.try_clone().unwrap(), receiver, model_event_sender.clone(), ui_event_sender, file_server, manager_pool);
+    model_event_loop(socket.try_clone().unwrap(), ui_event_sender, file_server, manager_pool);
 
-    start_daemon(socket.try_clone().unwrap(), model_event_sender.clone());
+    start_daemon(socket.try_clone().unwrap());
 
-    send_ipmsg_br_entry(model_event_sender.clone());
+    send_ipmsg_br_entry();
 }
 
-pub fn send_ipmsg_br_entry(model_event_sender: crossbeam_channel::Sender<ModelEvent>) {
-    let packet = Packet::new(IPMSG_BR_ENTRY|IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *constant::HOST_NAME, *constant::HOST_NAME)));
-    model_event_sender.send(ModelEvent::BroadcastEntry(packet)).unwrap();
+pub fn send_ipmsg_br_entry() {
+    let packet = Packet::new(IPMSG_BR_ENTRY|IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *protocol::HOST_NAME, *protocol::HOST_NAME)));
+    GLOBLE_SENDER.send(ModelEvent::BroadcastEntry(packet)).unwrap();
 }
 
-pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEvent>){
+pub fn start_daemon(socket: UdpSocket){
     let socket_clone = socket.try_clone().unwrap();
     thread::spawn(move||{
         loop {
@@ -71,7 +54,7 @@ pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEv
                     match result {
                         Ok((mut packet, _)) => {
                             packet.ip = src.ip().to_string();
-                            sender.send(ModelEvent::ReceivedPacket {packet}).unwrap();
+                            GLOBLE_SENDER.send(ModelEvent::ReceivedPacket {packet}).unwrap();
                         }
                         Err(_) => {
                             error!("Invalid packet {} !", receive_str);
@@ -86,13 +69,13 @@ pub fn start_daemon(socket: UdpSocket, sender: crossbeam_channel::Sender<ModelEv
     });
 }
 
-fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<ModelEvent>, model_event_sender: crossbeam_channel::Sender<ModelEvent>, ui_event_sender: glib::Sender<UiEvent>, file_server: FileServer, manager_pool: ManagerPool) {
+fn model_event_loop(socket: UdpSocket, ui_event_sender: glib::Sender<UiEvent>, file_server: FileServer, manager_pool: ManagerPool) {
     let socket_clone = socket.try_clone().unwrap();
     thread::spawn(move || {
-        while let Ok(ev) = receiver.recv() {
+        while let Ok(ev) = GLOBLE_RECEIVER.recv() {
             match ev {
                 ModelEvent::ReceivedPacket {packet} => {
-                    model_packet_dispatcher(packet, model_event_sender.clone());
+                    model_packet_dispatcher(packet);
                 }
                 ModelEvent::UserListSelected(text) => {
                     ui_event_sender.send(UiEvent::UpdateUserListFooterStatus(text)).unwrap();
@@ -107,7 +90,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                     info!("send BroadcastEntry !");
                 }
                 ModelEvent::RecMsgReply{packet, from_ip} => {
-                    let addr:String = format!("{}:{}", from_ip, constant::IPMSG_DEFAULT_PORT);
+                    let addr:String = format!("{}:{}", from_ip, protocol::IPMSG_DEFAULT_PORT);
                     socket_clone.set_broadcast(false).unwrap();
                     socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
                     info!("send RecMsgReply !");
@@ -117,7 +100,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                 }
                 ModelEvent::RecOnlineMsgReply {packet, from_user} => {
                     {
-                        let addr:String = format!("{}:{}", from_user.ip, constant::IPMSG_DEFAULT_PORT);
+                        let addr:String = format!("{}:{}", from_user.ip, protocol::IPMSG_DEFAULT_PORT);
                         socket_clone.set_broadcast(false).unwrap();
                         socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
                         info!("send RecOnlineMsgReply ! {packet:?}");
@@ -144,7 +127,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                     }).unwrap();
                 }
                 ModelEvent::SendOneMsg {to_ip, packet, context, files} => {
-                    let addr:String = format!("{}:{}", to_ip, constant::IPMSG_DEFAULT_PORT);
+                    let addr:String = format!("{}:{}", to_ip, protocol::IPMSG_DEFAULT_PORT);
                     socket_clone.set_broadcast(false).unwrap();
                     socket_clone.send_to(crate::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str()).expect("couldn't send message");
                     info!("send SendOneMsg !");
@@ -152,7 +135,7 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
                     {
                         let mut file_pool = file_server.file_pool.lock().unwrap();
                         if let Some(file) = files {
-                            (*file_pool).push(file);
+                            file_pool.push(file);
                         }
 
                     }
@@ -179,23 +162,23 @@ fn model_event_loop(socket: UdpSocket, receiver: crossbeam_channel::Receiver<Mod
 
 }
 
-fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel::Sender<ModelEvent>) {
+fn model_packet_dispatcher(packet: Packet) {
     let mut extstr = String::new();
     if let Some(ref additional_section) = (&packet).additional_section {
         extstr = additional_section.to_owned();
     }
-    let opt = constant::get_opt((&packet).command_no);
-    let cmd = constant::get_mode((&packet).command_no);
-    if opt&constant::IPMSG_SENDCHECKOPT != 0 {
-        let recvmsg = Packet::new(constant::IPMSG_RECVMSG, Some((&packet).packet_no.to_string()));
-        model_event_sender.send(ModelEvent::RecMsgReply{packet: recvmsg, from_ip: (&packet).ip.to_owned()});
+    let opt = protocol::get_opt((&packet).command_no);
+    let cmd = protocol::get_mode((&packet).command_no);
+    if opt& protocol::IPMSG_SENDCHECKOPT != 0 {
+        let recvmsg = Packet::new(protocol::IPMSG_RECVMSG, Some((&packet).packet_no.to_string()));
+        GLOBLE_SENDER.send(ModelEvent::RecMsgReply{packet: recvmsg, from_ip: (&packet).ip.to_owned()});
     }
-    if cmd == constant::IPMSG_BR_EXIT {//收到下线通知消息
-        model_event_sender.send(ModelEvent::BroadcastExit((&packet).sender_host.to_owned()));
-    }else if cmd == constant::IPMSG_BR_ENTRY {//收到上线通知消息
+    if cmd == protocol::IPMSG_BR_EXIT {//收到下线通知消息
+        GLOBLE_SENDER.send(ModelEvent::BroadcastExit((&packet).sender_host.to_owned()));
+    }else if cmd == protocol::IPMSG_BR_ENTRY {//收到上线通知消息
         ///扩展段 用户名|用户组
         let ext_vec = extstr.splitn(2, |c| c == ':').collect::<Vec<&str>>();
-        let ansentry_packet = Packet::new(constant::IPMSG_ANSENTRY, None);
+        let ansentry_packet = Packet::new(protocol::IPMSG_ANSENTRY, None);
 
         let group_name = if ext_vec.len() > 2 {
             ext_vec[1].to_owned()
@@ -205,29 +188,29 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
         let user_name = if ext_vec.len() > 1&& !ext_vec[0].is_empty() {
             ext_vec[0].to_owned()
         }else {
-            (&packet).sender_name.to_owned()
+            packet.sender_name.clone()
         };
 
         let user = User::new(user_name, (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), group_name);
         info!("{user:?}");
-        model_event_sender.send(ModelEvent::RecOnlineMsgReply{packet: ansentry_packet, from_user: user});
-    }else if cmd == constant::IPMSG_ANSENTRY {//通报新上线
+        GLOBLE_SENDER.send(ModelEvent::RecOnlineMsgReply{packet: ansentry_packet, from_user: user});
+    }else if cmd == protocol::IPMSG_ANSENTRY {//通报新上线
         let user = User::new((&packet).sender_name.to_owned(), (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), "".to_owned());
-        model_event_sender.send(ModelEvent::NotifyOnline{user});
-    }else if cmd == constant::IPMSG_SENDMSG {//收到发送的消息
+        GLOBLE_SENDER.send(ModelEvent::NotifyOnline{user});
+    }else if cmd == protocol::IPMSG_SENDMSG {//收到发送的消息
         //文字消息|文件扩展段
         let ext_vec = extstr.split('\0').collect::<Vec<&str>>();
-        if opt&constant::IPMSG_SECRETOPT != 0 {//是否是密封消息
+        if opt& protocol::IPMSG_SECRETOPT != 0 {//是否是密封消息
             info!("i am secret message !");
         }
         let msg_str = if ext_vec.len() > 0 { ext_vec[0] } else { "" };
         //文字消息内容|文件扩展
         let mut files_opt: Option<Vec<ReceivedSimpleFileInfo>> = None;
-        if opt&constant::IPMSG_FILEATTACHOPT != 0 {
+        if opt& protocol::IPMSG_FILEATTACHOPT != 0 {
             if ext_vec.len() > 1 {
                 let files_str: &str = ext_vec[1];
                 info!("i have file attachment {:?}", files_str);
-                let files = files_str.split(constant::FILELIST_SEPARATOR).into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+                let files = files_str.split(protocol::FILELIST_SEPARATOR).into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
                 let mut simple_file_infos = Vec::new();
                 for file_str in files {
                     let file_attr = file_str.splitn(6, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
@@ -242,9 +225,9 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
                         }
                         let file_attr = file_attr[4].parse::<u32>().unwrap();//文件属性
                         let ntime = NaiveDateTime::from_timestamp(mmtime_num, 0);
-                        if file_attr == constant::IPMSG_FILE_REGULAR {
+                        if file_attr == protocol::IPMSG_FILE_REGULAR {
                             info!("i am ipmsg_file_regular");
-                        }else if file_attr == constant::IPMSG_FILE_DIR {
+                        }else if file_attr == protocol::IPMSG_FILE_DIR {
                             info!("i am ipmsg_file_dir");
                         }else {
                             panic!("no no type")
@@ -267,10 +250,10 @@ fn model_packet_dispatcher(packet: Packet, model_event_sender: crossbeam_channel
         }
         let packet_clone = packet.clone();
         let received_packet_inner = ReceivedPacketInner::new((&packet).ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
-        model_event_sender.send(ModelEvent::ReceivedMsg {msg: received_packet_inner}).unwrap();
-    }else if cmd == constant::IPMSG_NOOPERATION {
+        GLOBLE_SENDER.send(ModelEvent::ReceivedMsg {msg: received_packet_inner}).unwrap();
+    }else if cmd == protocol::IPMSG_NOOPERATION {
         info!("i am IPMSG_NOOPERATION");
-    }else if cmd == constant::IPMSG_BR_ABSENCE {
+    }else if cmd == protocol::IPMSG_BR_ABSENCE {
         info!("i am IPMSG_BR_ABSENCE");
     }else {
 

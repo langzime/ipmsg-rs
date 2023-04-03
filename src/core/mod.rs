@@ -1,20 +1,10 @@
-mod constant;
-mod model;
-mod message;
+pub mod download;
+pub mod fileserver;
 
-#[macro_use]
-mod util;
-mod chat_window;
-mod download;
-mod events;
-mod fileserver;
-mod main_win;
-// mod chat_window_new;
-pub mod app;
 
 use crossbeam_channel::unbounded;
 use once_cell::sync::Lazy;
-use crate::events::model::ModelEvent;
+use crate::models::event::ModelEvent;
 
 
 ///

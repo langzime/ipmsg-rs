@@ -1,20 +1,17 @@
 [package]
-name = "raudient"
-version = "0.4.0"
+name = "ipmsg-rs"
+version = "0.6.0"
 authors = ["wangyanqing@langzi.me"]
 description = "ipmsg rewrite by rust."
 repository = "https://github.com/langzime/raudient"
 documentation = "https://docs.rs/raudient"
-keywords = ["ipmsg", "ipmessager"]
+keywords = ["ipmsg", "ipmessager", "ipmsg-rs"]
 license = "MIT"
 edition = "2021"
 
-[lib]
-name = "raudient"
-
 [[bin]]
-name = "raudient"
-path = "src/bin/raudient.rs"
+name = "ipmsg-rs"
+path = "src/main.rs"
 
 [dependencies]
 chrono = "0.4"
@@ -24,6 +21,7 @@ encoding = "0.2"
 log = "0.4"
 env_logger = "0.10"
 anyhow = "1"
+thiserror = "1.0"
 crossbeam-channel = "0.5"
 combine = "4"
 once_cell="1.12"

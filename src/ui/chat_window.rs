@@ -14,10 +14,11 @@ use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use log::{info, trace, warn};
 use glib::clone;
-use crate::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
-use crate::events::model::ModelEvent;
-use crate::message;
-use crate::constant;
+use crate::core::GLOBLE_SENDER;
+use crate::models::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
+use crate::models::event::ModelEvent;
+use crate::models::message;
+use crate::constants::protocol;
 //use crate::app::GLOBAL_CHATWINDOWS;
 
 // make moving clones into closures more convenient
@@ -32,7 +33,7 @@ pub struct ChatWindow {
     pub received_store :ListStore,
 }
 
-pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Sender<ModelEvent>, name :S, host_ip :S) -> ChatWindow {
+pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S) -> ChatWindow {
     let name: String = name.into();
     let host_ip: String = host_ip.into();
     let chat_title = &format!("和{}({})聊天窗口", name, host_ip);
@@ -73,18 +74,18 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     let pre_received_files_model = create_and_fill_model1();
     tree_view_received.set_model(Some(&pre_received_files_model));
     let files_send_clone = pre_send_files.clone();
-    btn_send.connect_clicked(clone!(@strong model_sender, @strong pre_send_files_model, @strong host_ip, @strong text_view_presend => move|_|{
+    btn_send.connect_clicked(clone!(@strong pre_send_files_model, @strong host_ip, @strong text_view_presend => move|_|{
         let (start_iter, mut end_iter) = text_view_presend.buffer().bounds();
         let context :&str = &text_view_presend.buffer().text(&start_iter, &end_iter, false);
         let (packet, share_file) = message::create_sendmsg(context.to_owned(), files_send_clone.clone().borrow().to_vec(), host_ip.clone());
-        model_sender.send(ModelEvent::SendOneMsg {to_ip: host_ip.clone(), packet, context: context.to_owned(), files: share_file}).unwrap();
-        (*files_send_clone.borrow_mut()).clear();
+        GLOBLE_SENDER.send(ModelEvent::SendOneMsg {to_ip: host_ip.clone(), packet, context: context.to_owned(), files: share_file}).unwrap();
+        files_send_clone.borrow_mut().clear();
         pre_send_files_model.clear();
-        &text_view_presend.buffer().set_text("");
+        text_view_presend.buffer().set_text("");
     }));
 
     let chat_window_open_save = chat_window.clone();
-    tree_view_received.connect_row_activated(clone!(@strong model_sender, @weak chat_window_open_save, @strong host_ip => move |tree_view, tree_path, tree_view_column| {
+    tree_view_received.connect_row_activated(clone!(@weak chat_window_open_save, @strong host_ip => move |tree_view, tree_path, tree_view_column| {
         let selection = tree_view.selection();
         if let Some((model, iter)) = selection.selected() {
             let name: String = model.get_value(&iter, 0).get().unwrap();
@@ -101,14 +102,13 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                 &[("保存", gtk::ResponseType::Ok), ("取消", gtk::ResponseType::Cancel)],
             );
 
-            let model_sender = model_sender.clone();
             let host_ip = host_ip.clone();
             file_chooser.connect_response(move |d: &gtk::FileChooserDialog, response: gtk::ResponseType| {
                 if response == gtk::ResponseType::Ok {
                     let file = d.file().expect("Couldn't get file");
                     let save_base_path: PathBuf = file.path().expect("Couldn't get file path");
                     info!("choosed {:?} {:?} {:?} {:?} {:?}", name, fid, pid, save_base_path, file_type);
-                    model_sender.send(ModelEvent::PutDownloadTaskInPool{ file: ReceivedSimpleFileInfo{
+                    GLOBLE_SENDER.send(ModelEvent::PutDownloadTaskInPool{ file: ReceivedSimpleFileInfo{
                         file_id: fid,
                         packet_id: pid,
                         name: name.clone(),
@@ -124,7 +124,7 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
     }));
 
     btn_clear.connect_clicked(clone!(@strong text_view_presend => move|_|{
-        &text_view_presend.buffer().set_text("");
+        text_view_presend.buffer().set_text("");
     }));
 
     let chat_window_open_file = chat_window.clone();
@@ -148,9 +148,9 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                 let metadata: Metadata = fs::metadata(&filename).unwrap();
                 let size = metadata.len();
                 let attr = if metadata.is_file() {
-                    crate::constant::IPMSG_FILE_REGULAR
+                    crate::constants::protocol::IPMSG_FILE_REGULAR
                 }else if metadata.is_dir() {
-                    crate::constant::IPMSG_FILE_DIR
+                    crate::constants::protocol::IPMSG_FILE_DIR
                 }else {
                     panic!("oh no!");
                 };
@@ -197,9 +197,9 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
                     let metadata: Metadata = fs::metadata(&filename).unwrap();
                     let size = metadata.len();
                     let attr = if metadata.is_file() {
-                        crate::constant::IPMSG_FILE_REGULAR
+                        crate::constants::protocol::IPMSG_FILE_REGULAR
                     }else if metadata.is_dir() {
-                        crate::constant::IPMSG_FILE_DIR
+                        crate::constants::protocol::IPMSG_FILE_DIR
                     }else {
                         panic!("oh no!");
                     };
@@ -235,8 +235,8 @@ pub fn create_chat_window<S: Into<String>>(model_sender: crossbeam_channel::Send
         return Inhibit(false);
     }));*/
 
-    chat_window.connect_close_request(clone!(@strong model_sender, @strong host_ip => @default-return glib::signal::Inhibit(false), move |window| {
-        model_sender.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: host_ip.clone()}).unwrap();
+    chat_window.connect_close_request(clone!(@strong host_ip => @default-return glib::signal::Inhibit(false), move |window| {
+        GLOBLE_SENDER.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: host_ip.clone()}).unwrap();
         if let Some(application) = window.application() {
             application.remove_window(window);
         }
