@@ -9,13 +9,9 @@ use std::net::UdpSocket;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs};
 use std::env::args;
 use human_panic::setup_panic;
-use gio::{ApplicationFlags, Menu, MenuItem};
+use gio::{ApplicationFlags, Icon, Menu, MenuItem};
 use gtk::prelude::*;
-use gtk::{
-    self, AboutDialog, Application, Builder, Button, CellRendererProgress, CellRendererText, Fixed,
-    Grid, IconSize, Image, Label, ListBox, ListBoxRow, ListStore,
-    Orientation, ScrolledWindow, TextView, TreeView, TreeViewColumn, Widget, Window,
-};
+use gtk::{self, AboutDialog, Application, Builder, Button, CellRendererPixbuf, CellRendererProgress, CellRendererText, Fixed, Grid, IconSize, Image, Label, ListBox, ListBoxRow, ListStore, Orientation, ScrolledWindow, TextView, TreeView, TreeViewColumn, Widget, Window};
 use gdk_pixbuf::Pixbuf;
 use glib::{MainContext, Receiver};
 use crossbeam_channel::unbounded;
@@ -102,7 +98,7 @@ impl MainWindow {
         tree.connect_cursor_changed( move |tree_view| {
             let selection = tree_view.selection();
             if let Some((model, iter)) = selection.selected() {
-                let str1 = model.get_value(&iter, 0).get::<String>().unwrap();
+                let str1 = model.get_value(&iter, 1).get::<String>().unwrap();
                 GLOBLE_SENDER.send(ModelEvent::UserListSelected(str1)).unwrap();
             }
         });
@@ -112,8 +108,8 @@ impl MainWindow {
         tree.connect_row_activated(move |tree_view, tree_path, tree_view_column| {
             let selection = tree_view.selection();
             if let Some((model, iter)) = selection.selected() {
-                let ip_str = model.get_value(&iter, 3).get::<String>().unwrap();
-                let name = model.get_value(&iter, 0).get::<String>().unwrap();
+                let ip_str = model.get_value(&iter, 4).get::<String>().unwrap();
+                let name = model.get_value(&iter, 1).get::<String>().unwrap();
                 GLOBLE_SENDER.send(ModelEvent::UserListDoubleClicked{name, ip: ip_str }).unwrap();
             }
         });
@@ -147,14 +143,14 @@ impl MainWindow {
                 UiEvent::UserListRemoveOne(ip) => {
                     if let Some(first) = model.iter_first() {//拿出来第一条
                         let mut num: u32 = model.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
-                        let ip1 = model.get_value(&first, 3).get::<String>().unwrap();//获取ip
+                        let ip1 = model.get_value(&first, 4).get::<String>().unwrap();//获取ip
                         if ip == ip1 {
                             model.remove(&first);
                         } else {
                             loop {
                                 num = num + 1;
                                 if let Some(next_iter) = model.iter_from_string(&num.to_string()) {
-                                    let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
+                                    let next_ip = model.get_value(&next_iter, 4).get::<String>().unwrap();//获取ip
                                     if next_ip == ip1 {
                                         model.remove(&next_iter);
                                         break;
@@ -170,14 +166,14 @@ impl MainWindow {
                     let mut in_flag = false;
                     if let Some(first) = model.iter_first() {//拿出来第一条
                         let mut num: u32 = model.string_from_iter(&first).unwrap().parse::<u32>().unwrap();//序号 会改变
-                        let ip = model.get_value(&first, 3).get::<String>().unwrap();//获取ip
+                        let ip = model.get_value(&first, 4).get::<String>().unwrap();//获取ip
                         if ip == income_user.ip {
                             in_flag = true;
                         } else {
                             loop {
                                 num = num + 1;
                                 if let Some(next_iter) = model.iter_from_string(&num.to_string()) {
-                                    let next_ip = model.get_value(&next_iter, 3).get::<String>().unwrap();//获取ip
+                                    let next_ip = model.get_value(&next_iter, 4).get::<String>().unwrap();//获取ip
                                     if next_ip == income_user.ip {
                                         in_flag = true;
                                         break;
@@ -190,7 +186,7 @@ impl MainWindow {
                     }
                     if !in_flag {
                         //model.insert_with_values(None, &[0, 1, 2, 3], &[&&income_user.name, &&income_user.group, &&income_user.host, &&income_user.ip]);
-                        model.insert_with_values(None, &[(0, &&income_user.name), (1, &&income_user.group), (2, &&income_user.host), (3, &&income_user.ip)]);
+                        model.insert_with_values(None, &[(0, &"face-smile"), (1, &&income_user.name), (2, &&income_user.group), (3, &&income_user.host), (4, &&income_user.ip)]);
                     }
                 }
                 UiEvent::CloseChatWindow(ip) => {
@@ -282,29 +278,23 @@ impl MainWindow {
 fn create_and_setup_view() -> TreeView {
     // Creating the tree view.
     let tree = TreeView::new();
-
-    // Creating the two columns inside the view.
-    append_column(&tree, 0, "用户名");
-    //append_column(&tree, 1, "工作组");
-    //append_column(&tree, 2, "主机名");
+    {
+        let renderer = CellRendererPixbuf::new();
+        let cell = CellRendererText::new();
+        let col = TreeViewColumn::new();
+        col.pack_start(&renderer, false);
+        col.pack_end(&cell, false);
+        // renderer.set_icon_name(Some("face-smile"));
+        col.add_attribute(&renderer, "icon-name", 0);
+        col.add_attribute(&cell, "text", 1);
+        tree.append_column(&col);
+    }
     tree.set_headers_visible(false);
     tree
 }
 
-fn append_column(tree: &TreeView, id: i32, title: &str) {
-    let column = TreeViewColumn::new();
-    let cell = CellRendererText::new();
-
-    column.pack_start(&cell, true);
-    // Association of the view's column with the model's `id` column.
-    column.set_title(title);
-    column.add_attribute(&cell, "text", id);
-    tree.append_column(&column);
-    tree.set_headers_visible(true);
-}
-
 fn create_and_fill_model() -> ListStore {
     // Creation of a model with two rows.
-    let model = ListStore::new(&[String::static_type(), String::static_type(), String::static_type(), String::static_type()]);
+    let model = ListStore::new(&[String::static_type(), String::static_type(), String::static_type(), String::static_type(), String::static_type()]);
     model
 }
