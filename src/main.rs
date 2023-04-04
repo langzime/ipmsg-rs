@@ -13,6 +13,8 @@ mod ui;
 mod core;
 mod constants;
 
+const APP_ID: &'static str = "com.github.ipmsg-rs";
+
 fn main() -> glib::ExitCode {
     setup_panic!();
     ::std::env::set_var("RUST_LOG", "info");
@@ -20,7 +22,7 @@ fn main() -> glib::ExitCode {
     /*let application = adw::Application::new(
         Some("com.github.ipmsg-rs"),
         ApplicationFlags::FLAGS_NONE);*/
-    let application = adw::Application::builder().application_id("com.github.ipmsg-rs").build();
+    let application = adw::Application::builder().application_id(APP_ID).build();
     application.connect_startup(move |app| {
         info!("starting up");
         MainWindow::new(app);
