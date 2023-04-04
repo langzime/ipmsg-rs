@@ -226,19 +226,11 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S) -> ChatWindow {
         file_chooser.show();
     }));
 
-
-    /*chat_window.connect_close_request(clone!(@strong model_sender, @strong host_ip, @weak chat_window => @default-return Inhibit(false),  move|_, _| {
-        model_sender.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: host_ip.clone()}).unwrap();
-        unsafe {
-                chat_window.destroy();
-            }
-        return Inhibit(false);
-    }));*/
-
     chat_window.connect_close_request(clone!(@strong host_ip => @default-return glib::signal::Inhibit(false), move |window| {
         GLOBLE_SENDER.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: host_ip.clone()}).unwrap();
         if let Some(application) = window.application() {
             application.remove_window(window);
+            window.destroy();
         }
         glib::signal::Inhibit(false)
     }));
