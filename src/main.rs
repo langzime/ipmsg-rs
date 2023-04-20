@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 
 use human_panic::setup_panic;
 use gio::ApplicationFlags;
