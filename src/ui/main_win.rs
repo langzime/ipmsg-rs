@@ -51,36 +51,6 @@ impl MainWindow {
 
         //纵向
         let v_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        /*let menu_bar = Menu::new();
-        let sytem_item = MenuItem::with_label("系统");
-        let menu_sys = Menu::new();
-        let about = MenuItem::with_label("关于");
-        let quit = MenuItem::with_label("退出");
-        MenuItem::new(Some("xxx"), Some("yyyyy"));
-        menu_sys.append(&about);
-        menu_sys.append(&quit);
-        sytem_item.set_submenu(Some(&menu_sys));
-        menu_bar.append(&sytem_item);
-
-        about.connect_activate(clone!(@weak  window => move |_| {
-            let p = AboutDialog::new();
-            p.set_website_label(Some("ipmsg"));
-            p.set_website(Some("https://www.langzi.me"));
-            p.set_authors(&["langzi"]);
-            p.set_logo(Some(&Pixbuf::from_file("./resources/eye.png").unwrap()));
-            p.set_title("关于");
-            p.set_transient_for(Some(&window));
-            p.run();
-            unsafe {
-             p.destroy();
-            }
-        }));
-
-        quit.connect_activate(clone!(@weak window => move |_| {
-            unsafe {
-                &window.destroy();
-            }
-        }));*/
 
         let label = Label::new(Option::from(""));
         let scrolled = ScrolledWindow::new();//None::<&gtk::Adjustment>, None::<&gtk::Adjustment>
@@ -200,12 +170,13 @@ impl MainWindow {
                 UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet } => {
                     match chat_windows.get(&ip) {
                         Some(win) => {
-                            //&window.set_focus(Some(v_box));
-                            //win.win.show();
+                            win.win.show();
                         }
                         None => {
                             let chat_win = crate::ui::chat_window::create_chat_window(name, ip.clone());
+                            chat_win.win.show();
                             chat_windows.insert(ip.clone(), chat_win);
+
                         }
                     }
                 }
