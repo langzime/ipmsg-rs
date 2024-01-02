@@ -232,7 +232,7 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S) -> ChatWindow {
             application.remove_window(window);
             window.destroy();
         }
-        glib::signal::Inhibit(false)
+        glib::Propagation::Proceed
     }));
 
 
@@ -263,8 +263,9 @@ fn create_and_fill_model1() -> ListStore {
     model
 }
 
+/*
 /// ip
 fn modify_received_list(received_store :Option<ListStore>, received_files: Arc<RefCell<Vec<ReceivedSimpleFileInfo>>>) -> Continue {
 
     Continue(false)
-}
+}*/

@@ -13,7 +13,7 @@ use gio::{ApplicationFlags, Icon, Menu, MenuItem};
 use gtk::prelude::*;
 use gtk::{self, AboutDialog, Application, Builder, Button, CellRendererPixbuf, CellRendererProgress, CellRendererText, Fixed, Grid, IconSize, Image, Label, ListBox, ListBoxRow, ListStore, Orientation, ScrolledWindow, TextView, TreeView, TreeViewColumn, Widget, Window};
 use gdk_pixbuf::Pixbuf;
-use glib::{MainContext, Receiver};
+use glib::{ControlFlow, MainContext, Priority, Receiver};
 use crossbeam_channel::unbounded;
 use log::{debug, info, trace, warn};
 use glib::clone;
@@ -28,7 +28,7 @@ pub struct MainWindow {}
 
 impl MainWindow {
     pub fn new(application: &adw::Application) -> MainWindow {
-        let (tx, rx): (glib::Sender<UiEvent>, glib::Receiver<UiEvent>) = MainContext::channel::<UiEvent>(glib::PRIORITY_HIGH);
+        let (tx, rx): (glib::Sender<UiEvent>, glib::Receiver<UiEvent>) = MainContext::channel::<UiEvent>(Priority::HIGH);
         // let (model_sender, model_receiver): (crossbeam_channel::Sender<ModelEvent>, crossbeam_channel::Receiver<ModelEvent>) = unbounded();
 
         let window = gtk::ApplicationWindow::new(application);
@@ -46,7 +46,7 @@ impl MainWindow {
             if let Some(application) = win.application() {
                 application.remove_window(win);
             }
-            glib::signal::Inhibit(false)
+            glib::Propagation::Stop
         }));
 
         //纵向
@@ -237,7 +237,7 @@ impl MainWindow {
                     println!("{}", "aaa");
                 }
             };
-            glib::Continue(true)
+            ControlFlow::Continue
         });
 
         window.set_child(Some(&v_box));
