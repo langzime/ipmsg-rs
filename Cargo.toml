@@ -29,6 +29,8 @@ gdk-pixbuf = "0.18"
 human-panic = "1.1.0"
 local-ip-address = "0.5"
 
+async-channel = "2.1"
+
 adw = { version = "0.5", package = "libadwaita", features = ["v1_4"] }
 
 [dependencies.gtk]
