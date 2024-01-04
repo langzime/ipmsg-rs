@@ -1,24 +1,20 @@
 use gtk::prelude::*;
 use gtk::{
-    self, CellRendererText, AboutDialog, IconSize, Image, Label, Window,
-    ListStore, TreeView, TreeViewColumn, Builder, Grid, Button, Orientation,
-    Widget, TextView, Fixed, ScrolledWindow, WrapMode
+    CellRendererText, Window,
+    ListStore, TreeView, TreeViewColumn, Builder, Button, TextView, WrapMode
 };
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::cell::RefCell;
-use std::sync::mpsc;
-use std::thread;
-use std::path::{PathBuf, Path};
-use std::fs::{self, File, Metadata, ReadDir};
-use std::time::{self, Duration, SystemTime, UNIX_EPOCH};
+use std::path::PathBuf;
+use std::fs::{self, Metadata};
+use std::time::{self};
 use chrono::prelude::*;
-use log::{info, trace, warn};
+use log::info;
 use glib::clone;
 use crate::core::GLOBLE_SENDER;
-use crate::models::model::{self, Packet, ShareInfo, ReceivedSimpleFileInfo};
+use crate::models::model::{self, ReceivedSimpleFileInfo};
 use crate::models::event::ModelEvent;
 use crate::models::message;
-use crate::constants::protocol;
 //use crate::app::GLOBAL_CHATWINDOWS;
 
 // make moving clones into closures more convenient
@@ -228,10 +224,11 @@ pub fn create_chat_window<S: Into<String>>(name :S, host_ip :S) -> ChatWindow {
 
     chat_window.connect_close_request(clone!(@strong host_ip => @default-return glib::signal::Inhibit(false), move |window| {
         GLOBLE_SENDER.send(ModelEvent::ClickChatWindowCloseBtn{from_ip: host_ip.clone()}).unwrap();
-        if let Some(application) = window.application() {
-            application.remove_window(window);
+        /*if let Some(application) = window.application() {
+            application.remove_window(window);*/
             window.destroy();
-        }
+            info!("关闭聊天窗口！");
+        // }
         glib::Propagation::Proceed
     }));
 

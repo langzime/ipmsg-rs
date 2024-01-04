@@ -1,16 +1,10 @@
 use std::collections::HashMap;
 use std::net::UdpSocket;
 use async_channel::{Sender, Receiver};
-use human_panic::setup_panic;
-use gio::{ApplicationFlags, Icon, Menu, MenuItem};
 use gtk::prelude::*;
-use gtk::{self, AboutDialog, Application, Builder, Button, CellRendererPixbuf, CellRendererProgress, CellRendererText, Fixed, Grid, IconSize, Image, Label, ListBox, ListBoxRow, ListStore, Orientation, ScrolledWindow, TextView, TreeView, TreeViewColumn, Widget, Window};
-use gdk_pixbuf::Pixbuf;
-use glib::{ControlFlow, MainContext, Priority};
-use crossbeam_channel::unbounded;
-use log::{debug, info, trace, warn};
+use gtk::{CellRendererPixbuf, CellRendererText, Label, ListStore, ScrolledWindow, TreeView, TreeViewColumn};
+use log::info;
 use glib::clone;
-use crate::models::model::{self, ErrMsg, FileInfo, Operate, OperUser, Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
 use crate::ui::chat_window::ChatWindow;
 use crate::events::model::model_run;
 use crate::models::event::ModelEvent;
@@ -154,11 +148,8 @@ impl MainWindow {
                         }
                     }
                     UiEvent::CloseChatWindow(ip) => {
-                        match chat_windows.get(&ip) {
-                            Some(win) => {
-                                chat_windows.remove(&ip);
-                            }
-                            None => {}
+                        if let Some(win) = chat_windows.get(&ip) {
+                            chat_windows.remove(&ip);
                         }
                     }
                     UiEvent::OpenOrReOpenChatWindow1 { name, ip, packet } => {

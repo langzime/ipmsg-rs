@@ -1,18 +1,18 @@
 use std::thread;
 use std::sync::{Arc, Mutex};
 use std::net::UdpSocket;
-use encoding::{DecoderTrap, EncoderTrap, Encoding};
+use encoding::{DecoderTrap, Encoding};
 use encoding::all::GB18030;
 use chrono::prelude::*;
 use std::collections::HashMap;
 use async_channel::Sender;
-use log::{debug, error, info, trace, warn};
+use log::{error, info};
 use combine::parser::Parser;
-use crate::models::model::{FileInfo, Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
+use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
 use crate::core::download::{ManagerPool, PoolFile};
 use crate::core::fileserver::FileServer;
 use crate::models::event::{ModelEvent, UiEvent};
-use crate::constants::protocol::{self, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_DEFAULT_PORT, IPMSG_FILEATTACHOPT, IPMSG_LIMITED_BROADCAST, IPMSG_SENDMSG};
+use crate::constants::protocol::{self, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_DEFAULT_PORT, IPMSG_LIMITED_BROADCAST};
 use crate::core::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::util::packet_parser;
 

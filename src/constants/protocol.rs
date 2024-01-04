@@ -1,3 +1,4 @@
+#![allow(warnings, unused)]
 /*  header  */
 ///飞鸽版本
 pub const IPMSG_VERSION: u32 = 0x0001;

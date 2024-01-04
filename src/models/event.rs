@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use crate::models::model::{FileInfo, Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
+use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
 
 pub enum UiEvent {
     UpdateUserListFooterStatus(String),//create_or_open_chat

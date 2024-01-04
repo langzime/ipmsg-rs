@@ -1,14 +1,12 @@
-use encoding::{Encoding, EncoderTrap, DecoderTrap};
+use encoding::{Encoding, EncoderTrap};
 use encoding::all::GB18030;
 use chrono::Utc;
 use chrono::DateTime;
 use std::time::UNIX_EPOCH;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use chrono::TimeZone;
 use combine::error::ParseError;
-use combine::{many1, many, Parser, Stream, sep_by, token, skip_many, skip_many1, satisfy, choice, optional, any};
-use combine::parser::range::{take_while, take_while1, take_until_range};
-use combine::parser::char::{letter, space, digit, char};
+use combine::{many1, many, Parser, Stream, token, satisfy};
 use crate::models::model::Packet;
 
 pub fn utf8_to_gb18030(ori_str : &str) -> Vec<u8> {
