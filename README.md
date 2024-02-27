@@ -20,6 +20,8 @@
 > https://gtk-rs.org/gtk4-rs/stable/latest/book/installation_windows.html
 > \
 > https://gtk-rs.org/gtk4-rs/stable/latest/book/libadwaita.html
+>
+> 建议用MSYS2安装gtk和libadwaita可以省很多事儿
 
 ### macos
 
