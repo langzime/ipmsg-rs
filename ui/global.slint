@@ -1,0 +1,7 @@
+@rust-attr(derive(serde::Serialize, serde::Deserialize))
+export struct User  { userId: string, name: string, active: bool}
+
+export global ListViewPageAdapter  {
+    pure callback to-upper-case(string) -> string;
+    in property <[User]> users: [];
+}

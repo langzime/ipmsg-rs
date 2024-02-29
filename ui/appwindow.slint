@@ -1,0 +1,26 @@
+import { Button, VerticalBox, ListView, HorizontalBox } from "std-widgets.slint";
+import { ToolBar } from "tool_bar.slint";
+import { UserList, UserListClick } from "user_list.slint";
+import { ChatWindow } from "chat_window.slint";
+import { ListViewPageAdapter, User } from "global.slint";
+export { ListViewPageAdapter, User }
+export { UserList }
+
+export component AppWindow inherits Window {
+    in-out property<int> counter: 42;
+    callback request-increase-value();
+    width: 850px;
+    height: 600px;
+    title: "ipmsg-rs";
+
+    HorizontalLayout {
+        alignment: start;
+        ToolBar {
+        }
+        UserList {  
+        }
+        ChatWindow {
+        }
+    }
+
+}

@@ -1,0 +1,77 @@
+import { TextEdit, VerticalBox } from "std-widgets.slint";
+export component ChatWindow inherits Rectangle {
+    background: #f5f5f5;
+    min-width: 590px;
+    height: 500px;
+    Flickable {
+        viewport-height: 600px;
+        VerticalBox {
+            Rectangle {
+                x:10px;
+                background: grey;
+                width: 570px;
+                // min-height: 50px;
+                Image {
+                    x: 10px; y: 10px;
+                    width: 40px;
+                    height: 40px;
+                    source: @image-url("../resources/head.png");
+                }
+                Text {
+                    x: 60px; y:10px;
+                    font-size: 14px;
+                    width: (parent.width - 60px*2)/2;
+                    text: "Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor";
+                    wrap: TextWrap.word-wrap;
+                    overflow: TextOverflow.elide;
+                }
+                
+            }
+            Rectangle {
+                x:10px;
+                background: grey;
+                width: 570px;
+                // min-height: 10px;
+                Image {
+                    x: 10px; y: 10px;
+                    width: 40px;
+                    height: 40px;
+                    source: @image-url("../resources/head.png");
+                }
+                Text {
+                    x: 60px; y:10px;
+                    font-size: 14px;
+                    width: (parent.width - 60px*2)/2;
+                    // height: parent.height - 10px;
+                    text: "Lorem ipsum dolor sit amet,consectetur adipisici elit Lorem ipsum dolor sit amet,consectetur adipisici elitLorem ipsum dolor sit amet,consectetur adipisici elitLorem ipsum dolor sit amet,consectetur adipisici elit ipsum dolor sit amet,consectetur adipisici elitLorem ipsum dolor sit amet,consectetur adipisici elit ipsum dolor sit amet,consectetur adipisici elitLorem ipsum dolor sit amet,consectetur adipisici elit ipsum dolor sit amet,consectetur adipisici elitLorem ipsum dolor sit amet,consectetur adipisici elit ipsum dolor sit amet,consectetur adipisici elitLorem ipsum dolor sit amet,consectetur adipisici elit";
+                    wrap: TextWrap.word-wrap;
+                    overflow: TextOverflow.elide;
+                    // height: 100%;
+                }
+                
+            }
+        
+            // Rectangle {
+            //     x: 10px; 
+            //     width: 570px;
+            //     Image {
+            //         x: parent.width - 10px - 40px; y: 10px;
+            //         width: 40px;
+            //         height: 40px;
+            //         source: @image-url("../resources/head.png");
+            //     }
+            //     Text {
+            //         x: parent.width - 60px - (parent.width - 60px*2)/2; y:10px;
+            //         font-size: 14px;
+            //         width: (parent.width - 60px*2)/2;
+            //         text: "Lorem ipsum dolor sit amet,consectetur adipisici elit";
+            //         wrap: TextWrap.word-wrap;
+            //         overflow: TextOverflow.elide;
+            //     }
+                
+            // }
+        }
+    }
+    
+    
+}

@@ -5,9 +5,9 @@ use encoding::{DecoderTrap, Encoding};
 use encoding::all::GB18030;
 use chrono::prelude::*;
 use std::collections::HashMap;
-use async_channel::Sender;
 use log::{error, info};
 use combine::parser::Parser;
+use tokio::sync::mpsc::{Sender, UnboundedSender};
 use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
 use crate::core::download::{ManagerPool, PoolFile};
 use crate::core::fileserver::FileServer;
@@ -16,7 +16,7 @@ use crate::constants::protocol::{self, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG
 use crate::core::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::util::packet_parser;
 
-pub fn model_run(socket: UdpSocket, ui_event_sender: Sender<UiEvent>) {
+pub fn model_run(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>) {
 
     let file_pool: Arc<Mutex<Vec<ShareInfo>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -69,7 +69,7 @@ pub fn start_daemon(socket: UdpSocket){
     });
 }
 
-fn model_event_loop(socket: UdpSocket, ui_event_sender: Sender<UiEvent>, file_server: FileServer, manager_pool: ManagerPool) {
+fn model_event_loop(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>, file_server: FileServer, manager_pool: ManagerPool) {
     let socket_clone = socket.try_clone().unwrap();
     thread::spawn(move || {
         while let Ok(ev) = GLOBLE_RECEIVER.recv() {
@@ -78,10 +78,10 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: Sender<UiEvent>, file_se
                     model_packet_dispatcher(packet);
                 }
                 ModelEvent::UserListSelected(text) => {
-                    ui_event_sender.try_send(UiEvent::UpdateUserListFooterStatus(text)).unwrap();
+                    ui_event_sender.send(UiEvent::UpdateUserListFooterStatus(text)).unwrap();
                 }
                 ModelEvent::UserListDoubleClicked {name, ip} => {
-                    ui_event_sender.try_send(UiEvent::OpenOrReOpenChatWindow {name, ip}).unwrap();
+                    ui_event_sender.send(UiEvent::OpenOrReOpenChatWindow {name, ip}).unwrap();
                 }
                 ModelEvent::BroadcastEntry(packet) => {
                     socket_clone.set_broadcast(true).unwrap();
@@ -96,7 +96,7 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: Sender<UiEvent>, file_se
                     info!("send RecMsgReply !");
                 }
                 ModelEvent::BroadcastExit(ip) => {
-                    ui_event_sender.try_send(UiEvent::UserListRemoveOne(ip)).unwrap();
+                    ui_event_sender.send(UiEvent::UserListRemoveOne(ip)).unwrap();
                 }
                 ModelEvent::RecOnlineMsgReply {packet, from_user} => {
                     {
@@ -105,21 +105,21 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: Sender<UiEvent>, file_se
                         socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
                         info!("send RecOnlineMsgReply ! {packet:?}");
                     }
-                    ui_event_sender.try_send(UiEvent::UserListAddOne(from_user)).unwrap();
+                    ui_event_sender.send(UiEvent::UserListAddOne(from_user)).unwrap();
                 }
                 ModelEvent::ClickChatWindowCloseBtn{from_ip} => {
-                    ui_event_sender.try_send(UiEvent::CloseChatWindow(from_ip)).unwrap();
+                    ui_event_sender.send(UiEvent::CloseChatWindow(from_ip)).unwrap();
                 }
                 ModelEvent::NotifyOnline {user} => {
-                    ui_event_sender.try_send(UiEvent::UserListAddOne(user)).unwrap();
+                    ui_event_sender.send(UiEvent::UserListAddOne(user)).unwrap();
                 }
                 ModelEvent::ReceivedMsg {msg} => {
                     let name = msg.clone().packet.unwrap().sender_name;
                     let ip = msg.clone().ip.clone();
-                    ui_event_sender.try_send(UiEvent::OpenOrReOpenChatWindow1 { name: name.clone(), ip: ip.clone(), packet: msg.clone().packet}).unwrap();
+                    ui_event_sender.send(UiEvent::OpenOrReOpenChatWindow1 { name: name.clone(), ip: ip.clone(), packet: msg.clone().packet}).unwrap();
                     let additional_section =  msg.clone().packet.unwrap().additional_section.unwrap();
                     let v: Vec<&str> = additional_section.split('\0').into_iter().collect();
-                    ui_event_sender.try_send(UiEvent::DisplayReceivedMsgInHis{
+                    ui_event_sender.send(UiEvent::DisplayReceivedMsgInHis{
                         from_ip: ip.clone(),
                         name: name.clone(),
                         context: v[0].to_owned(),
@@ -131,7 +131,7 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: Sender<UiEvent>, file_se
                     socket_clone.set_broadcast(false).unwrap();
                     socket_clone.send_to(crate::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str()).expect("couldn't send message");
                     info!("send SendOneMsg !");
-                    ui_event_sender.try_send(UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files: files.clone()}).unwrap();
+                    ui_event_sender.send(UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files: files.clone()}).unwrap();
                     {
                         let mut file_pool = file_server.file_pool.lock().unwrap();
                         if let Some(file) = files {
@@ -147,7 +147,7 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: Sender<UiEvent>, file_se
                     manager_pool.clone().run(file, save_base_path, download_ip);
                 }
                 ModelEvent::RemoveDownloadTaskInPool {packet_id, file_id, download_ip } => {
-                    ui_event_sender.try_send(UiEvent::RemoveInReceivedList{
+                    ui_event_sender.send(UiEvent::RemoveInReceivedList{
                         packet_id,
                         file_id,
                         download_ip
