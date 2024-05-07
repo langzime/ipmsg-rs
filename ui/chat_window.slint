@@ -9,6 +9,7 @@ export component ChatWindow inherits Rectangle {
             Rectangle {
                 x:10px;
                 background: grey;
+                height: a.preferred-height + 10px;
                 width: 570px;
                 // min-height: 50px;
                 Image {
@@ -17,11 +18,11 @@ export component ChatWindow inherits Rectangle {
                     height: 40px;
                     source: @image-url("../resources/head.png");
                 }
-                Text {
+                a := Text {
                     x: 60px; y:10px;
                     font-size: 14px;
                     width: (parent.width - 60px*2)/2;
-                    text: "Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor";
+                    text: "Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor 防腐剂的负担 Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor Lorem ipsum dolor";
                     wrap: TextWrap.word-wrap;
                     overflow: TextOverflow.elide;
                 }
@@ -31,6 +32,7 @@ export component ChatWindow inherits Rectangle {
                 x:10px;
                 background: grey;
                 width: 570px;
+                height: b.preferred-height + 10px;
                 // min-height: 10px;
                 Image {
                     x: 10px; y: 10px;
@@ -38,7 +40,7 @@ export component ChatWindow inherits Rectangle {
                     height: 40px;
                     source: @image-url("../resources/head.png");
                 }
-                Text {
+                b := Text {
                     x: 60px; y:10px;
                     font-size: 14px;
                     width: (parent.width - 60px*2)/2;
