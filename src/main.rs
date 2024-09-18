@@ -1,39 +1,79 @@
 // #![windows_subsystem = "windows"]
 
+mod constants;
+mod core;
+mod events;
 mod front;
 mod models;
-
-mod constants;
-
-mod events;
-
-mod core;
-
 mod util;
-
 use std::net::UdpSocket;
 // use human_panic::setup_panic;
 
 const APP_ID: &'static str = "com.github.ipmsg-rs";
 slint::include_modules!();
-use slint::{Color, Model, ModelRc, StandardListViewItem, VecModel, Weak};
-use std::rc::Rc;
-use log::{debug, info, warn};
-use slint::format;
 use crate::events::model::model_run;
 use crate::front::ui_worker::UiWorker;
 use anyhow::Result;
+use log::{debug, info, warn};
+use slint::format;
+use slint::{Color, Model, ModelRc, StandardListViewItem, VecModel, Weak};
+use std::rc::Rc;
 
 fn main() -> Result<()> {
-
-    log4rs::init_file("config/log4rs.yaml", Default::default()).unwrap();
+    log4rs::init_file("config/log4rs.yaml", Default::default())?;
     let todo_model = Rc::new(slint::VecModel::<User>::from(vec![
-        User { name: "王艳青".into(), userId: "xxxxx".into(), active: true },
-        User { name: "王小满".into(), userId: "xxxxx".into(), active: false },
+        User {
+            name: "浪子".into(),
+            userId: "langzi".into(),
+            active: true,
+        },
+        User {
+            name: "爱心💌".into(),
+            userId: "heart".into(),
+            active: false,
+        },
     ]));
 
-    let ui = AppWindow::new()?;
-    ui.global::<ListViewPageAdapter>().set_users(todo_model.into());
+    let todo_model1 = Rc::new(slint::VecModel::<Msg>::from(vec![
+        Msg {
+            image_url: Default::default(),
+            name: "浪子1".into(),
+            text: Default::default(),
+            userId: "xxxxx".into(),
+        },
+        Msg {
+            image_url: Default::default(),
+            name: "浪子2".into(),
+            text: Default::default(),
+            userId: "xxxxx".into(),
+        },
+        Msg {
+            image_url: Default::default(),
+            name: "浪子3".into(),
+            text: Default::default(),
+            userId: "xxxxx".into(),
+        },
+        Msg {
+            image_url: Default::default(),
+            name: "浪子4".into(),
+            text: Default::default(),
+            userId: "xxxxx".into(),
+        },
+        Msg {
+            image_url: Default::default(),
+            name: "浪子5".into(),
+            text: Default::default(),
+            userId: "xxxxx".into(),
+        },
+    ]));
+
+    let ui = IpmsgUI::new()?;
+    // ui.global::<ListViewPageAdapter>().set_users(todo_model.into());
+    ui.global::<ListViewPageAdapter>().set_msgs(todo_model1.into());
+
+    ui.global::<UserListAdapter>().on_change_selected_user(move |index| {
+        println!("selected user index: {}", index);
+    });
 
     let ui_worker = UiWorker::new(&ui);
 
@@ -42,15 +82,9 @@ fn main() -> Result<()> {
             info!("udp server start listening! {:?}", constants::protocol::ADDR.as_str());
             s
         }
-        Err(e) => panic!("couldn't bind socket: {}", e)
+        Err(e) => panic!("couldn't bind socket: {}", e),
     };
     model_run(socket, ui_worker.channel.clone());
-
-    let ui_handle: Weak<AppWindow> = ui.as_weak();
-    ui.on_request_increase_value(move || {
-        let ui = ui_handle.unwrap();
-        ui.set_counter(ui.get_counter() + 1);
-    });
     ui.run()?;
     Ok(())
 }

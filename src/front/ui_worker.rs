@@ -1,6 +1,6 @@
-use slint::Weak;
+use slint::{Model, Weak};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-use crate::AppWindow;
+use crate::{IpmsgUI, ListViewPageAdapter};
 use crate::models::event::{ModelEvent, UiEvent};
 use slint::ComponentHandle;
 
@@ -10,7 +10,7 @@ pub struct UiWorker {
 }
 
 impl UiWorker {
-    pub fn new(app_window: &AppWindow) -> Self {
+    pub fn new(app_window: &IpmsgUI) -> Self {
         let (channel, r) = tokio::sync::mpsc::unbounded_channel();
         let worker_thread = std::thread::spawn({
             let handle_weak = app_window.as_weak();
@@ -35,11 +35,55 @@ impl UiWorker {
 
 async fn ui_worker_loop(
     mut r: UnboundedReceiver<UiEvent>,
-    handle: slint::Weak<AppWindow>,
+    handle: Weak<IpmsgUI>,
 ) -> tokio::io::Result<()> {
     loop {
         if let Some(msg) = r.recv().await{
+            println!("{msg:?}");
+            match msg {
+                UiEvent::Quit => {
+                    break;
+                },
+                UiEvent::UpdateUserListFooterStatus(_) => {
 
+                }
+                UiEvent::OpenOrReOpenChatWindow { .. } => {
+
+                }
+                UiEvent::UserListRemoveOne(_) => {
+
+                }
+                UiEvent::UserListAddOne(user) => {
+                    handle
+                        .clone()
+                        .upgrade_in_event_loop(move |ipmsg_ui| {
+                            let users = ipmsg_ui.global::<ListViewPageAdapter>().get_users();
+                            for i in 0..users.row_count() {
+                                if let Some(mut c) = users.row_data(i) {
+
+                                }else{
+
+                                }
+                            }
+                            //h.global::<DependencyData>().set_model(ModelRc::new(model))
+                        });
+                }
+                UiEvent::CloseChatWindow(_) => {
+
+                }
+                UiEvent::OpenOrReOpenChatWindow1 { .. } => {
+
+                }
+                UiEvent::DisplaySelfSendMsgInHis { .. } => {
+
+                }
+                UiEvent::DisplayReceivedMsgInHis { .. } => {
+
+                }
+                UiEvent::RemoveInReceivedList { .. } => {
+
+                }
+            }
         }
     }
     Ok(())

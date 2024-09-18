@@ -8,11 +8,12 @@ use std::collections::HashMap;
 use log::{error, info};
 use combine::parser::Parser;
 use tokio::sync::mpsc::{Sender, UnboundedSender};
+use anyhow::Result;
 use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
 use crate::core::download::{ManagerPool, PoolFile};
 use crate::core::fileserver::FileServer;
 use crate::models::event::{ModelEvent, UiEvent};
-use crate::constants::protocol::{self, IPMSG_BR_ENTRY, IPMSG_BROADCASTOPT, IPMSG_DEFAULT_PORT, IPMSG_LIMITED_BROADCAST};
+use crate::constants::protocol;
 use crate::core::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::util::packet_parser;
 
@@ -36,7 +37,7 @@ pub fn model_run(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>) {
 }
 
 pub fn send_ipmsg_br_entry() {
-    let packet = Packet::new(IPMSG_BR_ENTRY|IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *protocol::HOST_NAME, *protocol::HOST_NAME)));
+    let packet = Packet::new(protocol::IPMSG_BR_ENTRY|protocol::IPMSG_BROADCASTOPT, Some(format!("{}\0\n{}", *protocol::HOST_NAME, *protocol::HOST_NAME)));
     GLOBLE_SENDER.send(ModelEvent::BroadcastEntry(packet)).unwrap();
 }
 
@@ -75,17 +76,17 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>
         while let Ok(ev) = GLOBLE_RECEIVER.recv() {
             match ev {
                 ModelEvent::ReceivedPacket {packet} => {
-                    model_packet_dispatcher(packet);
+                    model_packet_dispatcher(packet).expect("couldn't send message");
                 }
                 ModelEvent::UserListSelected(text) => {
-                    ui_event_sender.send(UiEvent::UpdateUserListFooterStatus(text)).unwrap();
+                    ui_event_sender.send(UiEvent::UpdateUserListFooterStatus(text)).expect("couldn't send message");
                 }
                 ModelEvent::UserListDoubleClicked {name, ip} => {
-                    ui_event_sender.send(UiEvent::OpenOrReOpenChatWindow {name, ip}).unwrap();
+                    ui_event_sender.send(UiEvent::OpenOrReOpenChatWindow {name, ip}).expect("couldn't send message");
                 }
                 ModelEvent::BroadcastEntry(packet) => {
                     socket_clone.set_broadcast(true).unwrap();
-                    let addr:String = format!("{}:{}", IPMSG_LIMITED_BROADCAST, IPMSG_DEFAULT_PORT);
+                    let addr:String = format!("{}:{}", protocol::IPMSG_LIMITED_BROADCAST, protocol::IPMSG_DEFAULT_PORT);
                     socket_clone.send_to(packet.to_string().as_bytes(), addr.as_str()).expect("couldn't send message");
                     info!("send BroadcastEntry !");
                 }
@@ -131,7 +132,7 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>
                     socket_clone.set_broadcast(false).unwrap();
                     socket_clone.send_to(crate::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str()).expect("couldn't send message");
                     info!("send SendOneMsg !");
-                    ui_event_sender.send(UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files: files.clone()}).unwrap();
+                    ui_event_sender.send(UiEvent::DisplaySelfSendMsgInHis {to_ip, context, files: files.clone()}).expect("couldn't send message");;
                     {
                         let mut file_pool = file_server.file_pool.lock().unwrap();
                         if let Some(file) = files {
@@ -162,19 +163,20 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>
 
 }
 
-fn model_packet_dispatcher(packet: Packet) {
+fn model_packet_dispatcher(packet: Packet) -> Result<()> {
     let mut extstr = String::new();
-    if let Some(ref additional_section) = (&packet).additional_section {
+    if let Some(ref additional_section) = packet.additional_section {
         extstr = additional_section.to_owned();
     }
-    let opt = protocol::get_opt((&packet).command_no);
-    let cmd = protocol::get_mode((&packet).command_no);
+    let opt = protocol::get_opt(packet.command_no);
+    let cmd = protocol::get_mode(packet.command_no);
+
     if opt& protocol::IPMSG_SENDCHECKOPT != 0 {
-        let recvmsg = Packet::new(protocol::IPMSG_RECVMSG, Some((&packet).packet_no.to_string()));
-        GLOBLE_SENDER.send(ModelEvent::RecMsgReply{packet: recvmsg, from_ip: (&packet).ip.to_owned()});
+        let recvmsg = Packet::new(protocol::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
+        GLOBLE_SENDER.send(ModelEvent::RecMsgReply{packet: recvmsg, from_ip: packet.ip.to_owned()})?;
     }
     if cmd == protocol::IPMSG_BR_EXIT {//收到下线通知消息
-        GLOBLE_SENDER.send(ModelEvent::BroadcastExit((&packet).sender_host.to_owned()));
+        GLOBLE_SENDER.send(ModelEvent::BroadcastExit(packet.sender_host.to_owned()))?;
     }else if cmd == protocol::IPMSG_BR_ENTRY {//收到上线通知消息
         ///扩展段 用户名|用户组
         let ext_vec = extstr.splitn(2, |c| c == ':').collect::<Vec<&str>>();
@@ -191,12 +193,12 @@ fn model_packet_dispatcher(packet: Packet) {
             packet.sender_name.clone()
         };
 
-        let user = User::new(user_name, (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), group_name);
+        let user = User::new(user_name, packet.sender_host.to_owned(), packet.ip.to_owned(), group_name);
         info!("{user:?}");
-        GLOBLE_SENDER.send(ModelEvent::RecOnlineMsgReply{packet: ansentry_packet, from_user: user});
+        GLOBLE_SENDER.send(ModelEvent::RecOnlineMsgReply{packet: ansentry_packet, from_user: user})?;
     }else if cmd == protocol::IPMSG_ANSENTRY {//通报新上线
-        let user = User::new((&packet).sender_name.to_owned(), (&packet).sender_host.to_owned(), (&packet).ip.to_owned(), "".to_owned());
-        GLOBLE_SENDER.send(ModelEvent::NotifyOnline{user});
+        let user = User::new(packet.sender_name.to_owned(), packet.sender_host.to_owned(), packet.ip.to_owned(), "".to_owned());
+        GLOBLE_SENDER.send(ModelEvent::NotifyOnline{user})?;
     }else if cmd == protocol::IPMSG_SENDMSG {//收到发送的消息
         //文字消息|文件扩展段
         let ext_vec = extstr.split('\0').collect::<Vec<&str>>();
@@ -223,8 +225,8 @@ fn model_packet_dispatcher(packet: Packet) {
                         if mmtime_num >= 10000000000 {
                             mmtime_num = (mmtime_num as i64)/1000;
                         }
-                        let file_attr = file_attr[4].parse::<u32>().unwrap();//文件属性
-                        let ntime = NaiveDateTime::from_timestamp(mmtime_num, 0);
+                        let file_attr = file_attr[4].parse::<u32>()?;//文件属性
+                        let ntime = DateTime::from_timestamp(mmtime_num, 0);
                         if file_attr == protocol::IPMSG_FILE_REGULAR {
                             info!("i am ipmsg_file_regular");
                         }else if file_attr == protocol::IPMSG_FILE_DIR {
@@ -234,7 +236,7 @@ fn model_packet_dispatcher(packet: Packet) {
                         }
                         let simple_file_info = ReceivedSimpleFileInfo {
                             file_id,
-                            packet_id: (&packet).packet_no.parse::<u32>().unwrap(),
+                            packet_id: packet.packet_no.parse::<u32>()?,
                             name: file_name.to_owned(),
                             attr: file_attr as u8,
                             size,
@@ -249,8 +251,8 @@ fn model_packet_dispatcher(packet: Packet) {
             };
         }
         let packet_clone = packet.clone();
-        let received_packet_inner = ReceivedPacketInner::new((&packet).ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
-        GLOBLE_SENDER.send(ModelEvent::ReceivedMsg {msg: received_packet_inner}).unwrap();
+        let received_packet_inner = ReceivedPacketInner::new(packet.ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
+        GLOBLE_SENDER.send(ModelEvent::ReceivedMsg {msg: received_packet_inner})?;
     }else if cmd == protocol::IPMSG_NOOPERATION {
         info!("i am IPMSG_NOOPERATION");
     }else if cmd == protocol::IPMSG_BR_ABSENCE {
@@ -258,4 +260,5 @@ fn model_packet_dispatcher(packet: Packet) {
     }else {
 
     }
+    Ok(())
 }

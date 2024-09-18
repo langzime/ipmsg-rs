@@ -1,0 +1,23 @@
+import { Button, VerticalBox, ListView, HorizontalBox } from "std-widgets.slint";
+import { ChatWindow, ToolBar, UserList, UserListAdapter } from "./views/index.slint";
+import { ROOT_GLOBAL, ListViewPageAdapter, User } from "./global.slint";
+
+export { ListViewPageAdapter, User }
+export { UserList, UserListAdapter }
+
+export component IpmsgUI inherits Window {
+    width: ROOT_GLOBAL.window-width;
+    height: ROOT_GLOBAL.window-height;
+    title: @tr("ipmsg");
+
+    HorizontalLayout {
+        alignment: start;
+        ToolBar {
+        }
+        UserList {  
+        }
+        ChatWindow {
+        }
+    }
+
+}

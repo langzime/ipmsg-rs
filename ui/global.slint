@@ -1,7 +1,17 @@
 @rust-attr(derive(serde::Serialize, serde::Deserialize))
 export struct User  { userId: string, name: string, active: bool}
 
+@rust-attr(derive(serde::Serialize, serde::Deserialize))
+export struct Msg  { userId: string, name: string, image_url: string, text: string}
+
 export global ListViewPageAdapter  {
-    pure callback to-upper-case(string) -> string;
     in property <[User]> users: [];
+    in property <[Msg]> msgs: [];
+}
+
+export global ROOT_GLOBAL {
+    in-out property <length> window-width: 850px;
+    in-out property <length> window-height: 600px;
+    in-out property <length> font-size: 16px;
+    in-out property <length> padding: 0px;
 }
