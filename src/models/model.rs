@@ -1,6 +1,7 @@
-use chrono::prelude::*;
-use std::path::PathBuf;
 use crate::constants::protocol::{self, IPMSG_VERSION};
+use chrono::prelude::*;
+use std::fmt::Display;
+use std::path::PathBuf;
 
 ///
 /// 数据包格式
@@ -68,7 +69,6 @@ impl PacketBuilder {
 }
 
 impl Packet {
-
     ///new packet
     pub fn new(command_no: u32, additional_section: Option<String>) -> Packet {
         let local: DateTime<Local> = Local::now();
@@ -77,50 +77,43 @@ impl Packet {
             packet_no: format!("{}", local.timestamp()),
             sender_name: protocol::HOST_NAME.clone(),
             sender_host: protocol::HOST_NAME.clone(),
-            command_no: command_no,
-            additional_section: additional_section,
+            command_no,
+            additional_section,
             ip: "".to_owned(),
         }
     }
 
     /// from attrs 生成packet
-    pub fn from<S>(ver: S,
-                packet_no: S,
-                sender_name: S,
-                sender_host: S,
-                command_no: u32,
-                additional_section: Option<String>) -> Packet where S: Into<String> {
+    pub fn from<S>(ver: S, packet_no: S, sender_name: S, sender_host: S, command_no: u32, additional_section: Option<String>) -> Packet
+    where
+        S: Into<String>,
+    {
         Packet {
             ver: ver.into(),
             packet_no: packet_no.into(),
             sender_name: sender_name.into(),
             sender_host: sender_host.into(),
-            command_no: command_no,
-            additional_section: additional_section,
+            command_no,
+            additional_section,
             ip: "".to_owned(),
         }
     }
 }
 
-impl ToString for Packet {
-    fn to_string(&self) -> String {
-        if let Some(ref ext_str) = self.additional_section {
-            format!("{}:{}:{}:{}:{}:{}",
-                    self.ver,
-                    self.packet_no,
-                    self.sender_name,
-                    self.sender_host,
-                    self.command_no,
-                    ext_str)
-        }else {
-            format!("{}:{}:{}:{}:{}:{}",
-                    self.ver,
-                    self.packet_no,
-                    self.sender_name,
-                    self.sender_host,
-                    self.command_no,
-                    "")
-        }
+impl Display for Packet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = if let Some(ref ext_str) = self.additional_section {
+            format!(
+                "{}:{}:{}:{}:{}:{}",
+                self.ver, self.packet_no, self.sender_name, self.sender_host, self.command_no, ext_str
+            )
+        } else {
+            format!(
+                "{}:{}:{}:{}:{}:{}",
+                self.ver, self.packet_no, self.sender_name, self.sender_host, self.command_no, ""
+            )
+        };
+        write!(f, "{}", str)
     }
 }
 
@@ -133,8 +126,8 @@ pub struct User {
 }
 
 impl User {
-    pub fn new<S: Into<String>>(name :S, host :S, ip :S, group :S) -> User {
-        User{
+    pub fn new<S: Into<String>>(name: S, host: S, ip: S, group: S) -> User {
+        User {
             name: name.into(),
             host: host.into(),
             ip: ip.into(),
@@ -145,21 +138,19 @@ impl User {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Operate {
-    ADD, REMOVE
+    ADD,
+    REMOVE,
 }
 
 #[derive(Clone, Debug)]
-pub struct OperUser{
-    pub user :User,
+pub struct OperUser {
+    pub user: User,
     pub oper: Operate,
 }
 
 impl OperUser {
-    pub fn new(user: User, oper :Operate) -> OperUser{
-        OperUser{
-            user: user,
-            oper: oper,
-        }
+    pub fn new(user: User, oper: Operate) -> OperUser {
+        OperUser { user: user, oper: oper }
     }
 }
 
@@ -188,7 +179,7 @@ pub struct FileInfo {
     pub file_name: PathBuf,
     pub name: String,
     //文件的属性，如是文件或者文件夹，只读等
-    pub attr: u8,// 1 普通文件 2 文件夹
+    pub attr: u8, // 1 普通文件 2 文件夹
     //文件大小
     pub size: u64,
     //文件最后一次修改时间
@@ -196,18 +187,19 @@ pub struct FileInfo {
     //文件最后一次访问时间
     pub atime: NaiveTime,
     //文件创建时间
-    pub crtime: NaiveTime
+    pub crtime: NaiveTime,
 }
 
 impl FileInfo {
     pub fn to_fileinfo_msg(&self) -> String {
-        self.file_name.as_path().file_name()
-            .and_then(|name| { name.to_str() })
-            .map(|file_name| { format!("{}:{}:{:x}:{:x}:{}:", self.file_id, file_name, self.size, self.mtime.second(), self.attr) }).unwrap()
-
+        self.file_name
+            .as_path()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|file_name| format!("{}:{}:{:x}:{:x}:{}:", self.file_id, file_name, self.size, self.mtime.second(), self.attr))
+            .unwrap()
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct ReceivedSimpleFileInfo {
@@ -215,7 +207,7 @@ pub struct ReceivedSimpleFileInfo {
     pub file_id: u32,
     pub packet_id: u32,
     pub name: String,
-    pub attr: u8,// 1 普通文件 2 文件夹
+    pub attr: u8, // 1 普通文件 2 文件夹
     pub size: u64,
     pub mtime: i64,
 }

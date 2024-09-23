@@ -25,6 +25,15 @@ export component UserList inherits Rectangle {
                     height: 40px;
                     source: @image-url("../../resources/head.png");
                 }
+                Rectangle {
+                    visible: data.unread_count > 0;
+                    background: red;
+                    x: 45px;
+                    y: 5px;
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 5px;
+                }
                 VerticalLayout {
                     padding-top: 15px;
                     Text {

@@ -5,6 +5,7 @@ mod core;
 mod events;
 mod front;
 mod models;
+mod store;
 mod util;
 use std::net::UdpSocket;
 // use human_panic::setup_panic;
@@ -13,7 +14,10 @@ const APP_ID: &'static str = "com.github.ipmsg-rs";
 slint::include_modules!();
 use crate::events::model::model_run;
 use crate::front::ui_worker::UiWorker;
+use crate::store::establish_connection;
+use crate::store::models::Messages;
 use anyhow::Result;
+use diesel::prelude::*;
 use log::{debug, info, warn};
 use slint::format;
 use slint::{Color, Model, ModelRc, StandardListViewItem, VecModel, Weak};
@@ -21,58 +25,24 @@ use std::rc::Rc;
 
 fn main() -> Result<()> {
     log4rs::init_file("config/log4rs.yaml", Default::default())?;
-    let todo_model = Rc::new(slint::VecModel::<User>::from(vec![
-        User {
-            name: "浪子".into(),
-            userId: "langzi".into(),
-            active: true,
-        },
-        User {
-            name: "爱心💌".into(),
-            userId: "heart".into(),
-            active: false,
-        },
-    ]));
-
-    let todo_model1 = Rc::new(slint::VecModel::<Msg>::from(vec![
-        Msg {
-            image_url: Default::default(),
-            name: "浪子1".into(),
-            text: Default::default(),
-            userId: "xxxxx".into(),
-        },
-        Msg {
-            image_url: Default::default(),
-            name: "浪子2".into(),
-            text: Default::default(),
-            userId: "xxxxx".into(),
-        },
-        Msg {
-            image_url: Default::default(),
-            name: "浪子3".into(),
-            text: Default::default(),
-            userId: "xxxxx".into(),
-        },
-        Msg {
-            image_url: Default::default(),
-            name: "浪子4".into(),
-            text: Default::default(),
-            userId: "xxxxx".into(),
-        },
-        Msg {
-            image_url: Default::default(),
-            name: "浪子5".into(),
-            text: Default::default(),
-            userId: "xxxxx".into(),
-        },
-    ]));
 
     let ui = IpmsgUI::new()?;
-    // ui.global::<ListViewPageAdapter>().set_users(todo_model.into());
-    ui.global::<ListViewPageAdapter>().set_msgs(todo_model1.into());
-
-    ui.global::<UserListAdapter>().on_change_selected_user(move |index| {
-        println!("selected user index: {}", index);
+    let handle = ui.as_weak();
+    ui.global::<UserListAdapter>().on_change_selected_user(move |selected_user_id| {
+        let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
+            let users = ipmsg_ui.global::<ListViewPageAdapter>().get_users();
+            let the_model = users.as_any().downcast_ref::<VecModel<User>>().expect("downcast_ref VecModel<User> fail!");
+            for i in 0..the_model.row_count() {
+                if let Some(mut u) = the_model.row_data(i) {
+                    if u.userId == selected_user_id {
+                        u.active = true;
+                    } else {
+                        u.active = false;
+                    }
+                    the_model.set_row_data(i, u);
+                }
+            }
+        });
     });
 
     let ui_worker = UiWorker::new(&ui);

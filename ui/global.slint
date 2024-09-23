@@ -1,5 +1,5 @@
 @rust-attr(derive(serde::Serialize, serde::Deserialize))
-export struct User  { userId: string, name: string, active: bool}
+export struct User  { userId: string, name: string, active: bool, last_beat_time: string, on_line: bool, unread_count: int}
 
 @rust-attr(derive(serde::Serialize, serde::Deserialize))
 export struct Msg  { userId: string, name: string, image_url: string, text: string}

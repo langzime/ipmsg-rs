@@ -1,11 +1,9 @@
 pub mod download;
 pub mod fileserver;
 
-
+use crate::models::event::ModelEvent;
 use crossbeam_channel::unbounded;
 use once_cell::sync::Lazy;
-use crate::models::event::ModelEvent;
-
 
 ///
 /// 全局队列
