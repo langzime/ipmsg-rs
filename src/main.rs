@@ -7,15 +7,16 @@ mod front;
 mod models;
 mod store;
 mod util;
+// use human_panic::{setup_panic, Metadata};
 use std::net::UdpSocket;
-// use human_panic::setup_panic;
+use std::panic;
 
 const APP_ID: &'static str = "com.github.ipmsg-rs";
 slint::include_modules!();
 use crate::events::model::model_run;
 use crate::front::ui_worker::UiWorker;
 use crate::store::establish_connection;
-use crate::store::logic::init;
+use crate::store::logic::db_init;
 use crate::store::models::Messages;
 use anyhow::Result;
 use diesel::prelude::*;
@@ -25,8 +26,10 @@ use slint::{Color, Model, ModelRc, StandardListViewItem, VecModel, Weak};
 use std::rc::Rc;
 
 fn main() -> Result<()> {
-    log4rs::init_file("config/log4rs.yaml", Default::default())?;
-    init()?;
+    let config_str = include_str!("../config/log4rs.yaml");
+    let config = serde_yaml::from_str(config_str)?;
+    log4rs::init_raw_config(config)?;
+    db_init()?;
     let ui = IpmsgUI::new()?;
     let handle = ui.as_weak();
     ui.global::<UserListAdapter>().on_change_selected_user(move |selected_user_id| {

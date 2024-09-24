@@ -1,10 +1,10 @@
 -- Your SQL goes here
-create table messages(
-    id integer primary key,
-    msg_type integer not null,
+create table "messages" (
+    msg_id integer PRIMARY KEY AUTOINCREMENT,
+    msg_type int not null,
     chat_user_id text not null,
-    body text not null,
-    to_user_id text not null default '',
-    created_at timestamp default now(),
-    updated_at timestamp default now()
+    body text not null default '',
+    to_user_id text not null ,
+    created_at timestamp default (UNIXEPOCH()),
+    updated_at timestamp default (UNIXEPOCH())
 );

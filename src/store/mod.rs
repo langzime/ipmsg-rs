@@ -15,11 +15,15 @@ pub struct AppConfig;
 impl AppConfig {
     pub fn get_database_url() -> String {
         if let Some(mut tmp) = dirs::config_dir() {
-            tmp.push("ipmsg-rs");
-            tmp.push("data.dat");
-            return tmp.into_os_string().into_string().unwrap();
+            tmp = tmp.join("ipmsg-rs");
+            if tmp.exists() == false {
+                std::fs::create_dir_all(&tmp).expect("create dir failed");
+            }
+            tmp = tmp.join("data.dat");
+            tmp.into_os_string().into_string().unwrap()
+        } else {
+            panic!("获取操作系统配置目录失败！");
         }
-        "".to_string()
     }
 }
 

@@ -8,7 +8,7 @@ use diesel::sqlite::Sqlite;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-pub fn init() -> Result<()> {
+pub fn db_init() -> Result<()> {
     let mut conn = GLOBAL_POOL.clone().get().expect("Could not get connection from pool");
     // let message1 = messages.select(id).find(id).select(Messages::as_select()).first(&mut conn).optional();
     run_migrations(&mut conn)?;
