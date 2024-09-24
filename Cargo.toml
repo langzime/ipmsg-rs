@@ -33,9 +33,10 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.39", features = ["full"] }
 log4rs = "1.3.0"
-diesel = { version = "2.2.4", features = ["sqlite", "chrono", "r2d2"] }
+diesel = { version = "2.2.4", features = ["sqlite", "chrono", "r2d2", "returning_clauses_for_sqlite_3_35"] }
 dirs = "5.0.1"
 config = "0.14.0"
+diesel_migrations = "2.2.0"
 
 
 [build-dependencies]

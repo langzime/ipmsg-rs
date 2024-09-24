@@ -15,6 +15,7 @@ pub struct AppConfig;
 impl AppConfig {
     pub fn get_database_url() -> String {
         if let Some(mut tmp) = dirs::config_dir() {
+            tmp.push("ipmsg-rs");
             tmp.push("data.dat");
             return tmp.into_os_string().into_string().unwrap();
         }
@@ -27,6 +28,7 @@ pub fn establish_connection(database_url: &str) -> SqliteConnection {
 }
 
 pub fn get_connection_pool(database_url: &str) -> Pool<ConnectionManager<SqliteConnection>> {
+    println!("database_url:{}", database_url);
     let manager = ConnectionManager::<SqliteConnection>::new(database_url);
     Pool::builder().test_on_check_out(true).build(manager).expect("Could not build connection pool")
 }

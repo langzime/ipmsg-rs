@@ -15,6 +15,7 @@ slint::include_modules!();
 use crate::events::model::model_run;
 use crate::front::ui_worker::UiWorker;
 use crate::store::establish_connection;
+use crate::store::logic::init;
 use crate::store::models::Messages;
 use anyhow::Result;
 use diesel::prelude::*;
@@ -25,7 +26,7 @@ use std::rc::Rc;
 
 fn main() -> Result<()> {
     log4rs::init_file("config/log4rs.yaml", Default::default())?;
-
+    init()?;
     let ui = IpmsgUI::new()?;
     let handle = ui.as_weak();
     ui.global::<UserListAdapter>().on_change_selected_user(move |selected_user_id| {

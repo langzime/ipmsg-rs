@@ -5,7 +5,6 @@ diesel::table! {
         chat_user_id -> Varchar,
         to_user_id -> Varchar,
         body -> Text,
-        file_names -> Text,
         created_at -> Timestamp,
         updated_at -> Timestamp,
     }
