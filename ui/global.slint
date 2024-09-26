@@ -7,6 +7,7 @@ export struct Msg  { userId: string, name: string, image_url: string, text: stri
 export global ListViewPageAdapter  {
     in property <[User]> users: [];
     in property <[Msg]> msgs: [];
+    in property <string> user_id: "";
 }
 
 export global ROOT_GLOBAL {

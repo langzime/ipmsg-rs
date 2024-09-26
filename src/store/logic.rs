@@ -1,6 +1,6 @@
 use crate::store::models::Messages;
 use crate::store::schema::messages::dsl::*;
-use crate::store::schema::messages::id;
+use crate::store::schema::messages::*;
 use crate::store::GLOBAL_POOL;
 use anyhow::{anyhow, Result};
 use diesel::prelude::*;
@@ -20,4 +20,16 @@ fn run_migrations(connection: &mut impl MigrationHarness<Sqlite>) -> Result<()> 
         .run_pending_migrations(MIGRATIONS)
         .map_err(|e| anyhow!("run_migrations fail!{}", e))?;
     Ok(())
+}
+
+pub fn list_latest_messages(user_id: String, num: i64) -> Result<Vec<Messages>> {
+    let mut conn = GLOBAL_POOL.clone().get().expect("Could not get connection from pool");
+    let mut vec = messages
+        .filter(chat_user_id.eq(user_id))
+        .limit(num)
+        .select(Messages::as_select())
+        .order_by(id.desc())
+        .load(&mut conn)?;
+    vec.sort_by(|a, b| a.id.cmp(&b.id));
+    Ok(vec)
 }

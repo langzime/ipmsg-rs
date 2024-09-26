@@ -35,6 +35,8 @@ fn main() -> Result<()> {
     ui.global::<UserListAdapter>().on_change_selected_user(move |selected_user_id| {
         let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
             let users = ipmsg_ui.global::<ListViewPageAdapter>().get_users();
+            let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
+            ipmsg_ui.global::<ListViewPageAdapter>().set_user_id(selected_user_id.clone());
             let the_model = users.as_any().downcast_ref::<VecModel<User>>().expect("downcast_ref VecModel<User> fail!");
             for i in 0..the_model.row_count() {
                 if let Some(mut u) = the_model.row_data(i) {
