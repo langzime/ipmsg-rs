@@ -83,14 +83,6 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>
                 ModelEvent::ReceivedPacket { packet } => {
                     model_packet_dispatcher(packet).expect("couldn't send message");
                 }
-                ModelEvent::UserListSelected(text) => {
-                    ui_event_sender.send(UiEvent::UpdateUserListFooterStatus(text)).expect("couldn't send message");
-                }
-                ModelEvent::UserListDoubleClicked { name, ip } => {
-                    ui_event_sender
-                        .send(UiEvent::OpenOrReOpenChatWindow { name, ip })
-                        .expect("couldn't send message");
-                }
                 ModelEvent::BroadcastEntry(packet) => {
                     socket_clone.set_broadcast(true).unwrap();
                     let addr: String = format!("{}:{}", protocol::IPMSG_LIMITED_BROADCAST, protocol::IPMSG_DEFAULT_PORT);
@@ -121,22 +113,12 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>
                     }
                     ui_event_sender.send(UiEvent::UserListAddOne(from_user)).unwrap();
                 }
-                ModelEvent::ClickChatWindowCloseBtn { from_ip } => {
-                    ui_event_sender.send(UiEvent::CloseChatWindow(from_ip)).unwrap();
-                }
                 ModelEvent::NotifyOnline { user } => {
                     ui_event_sender.send(UiEvent::UserListAddOne(user)).unwrap();
                 }
                 ModelEvent::ReceivedMsg { msg } => {
                     let name = msg.clone().packet.unwrap().sender_name;
                     let ip = msg.clone().ip.clone();
-                    ui_event_sender
-                        .send(UiEvent::OpenOrReOpenChatWindow1 {
-                            name: name.clone(),
-                            ip: ip.clone(),
-                            packet: msg.clone().packet,
-                        })
-                        .unwrap();
                     let additional_section = msg.clone().packet.unwrap().additional_section.unwrap();
                     let v: Vec<&str> = additional_section.split('\0').into_iter().collect();
                     ui_event_sender
