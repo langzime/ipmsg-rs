@@ -24,7 +24,7 @@ fn run_migrations(connection: &mut impl MigrationHarness<Sqlite>) -> Result<()> 
 pub fn list_latest_messages(user_id: String, num: i64) -> Result<Vec<Messages>> {
     let mut conn = GLOBAL_POOL.clone().get().expect("Could not get connection from pool");
     let mut vec = messages
-        .filter(chat_user_id.eq(user_id))
+        .filter(sender_id.eq(user_id))
         .limit(num)
         .select(Messages::as_select())
         .order_by(id.desc())
