@@ -1,4 +1,4 @@
-use crate::store::models::{Messages, NewMessages};
+use crate::store::models::{Messages, NewMessage};
 use crate::store::schema::messages::dsl::*;
 use crate::store::schema::messages::*;
 use crate::store::GLOBAL_POOL;
@@ -33,7 +33,7 @@ pub fn list_latest_messages(user_id: String, num: i64) -> Result<Vec<Messages>> 
     Ok(vec)
 }
 
-pub fn insert_message(msg: NewMessages) -> Result<i32> {
+pub fn insert_message(msg: NewMessage) -> Result<i32> {
     let mut conn = GLOBAL_POOL.clone().get().expect("Could not get connection from pool");
     let msg_id = diesel::insert_into(messages).values(msg).returning(id).get_result(&mut conn)?;
     Ok(msg_id)

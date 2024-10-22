@@ -1,5 +1,6 @@
 use crate::constants::protocol::{self, IPMSG_VERSION};
 use chrono::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::PathBuf;
 
@@ -201,7 +202,7 @@ impl FileInfo {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ReceivedSimpleFileInfo {
     //要传输文件id
     pub file_id: u32,

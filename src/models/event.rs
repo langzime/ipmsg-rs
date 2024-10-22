@@ -1,4 +1,5 @@
 use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
+use crate::store::models::NewMessage;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -33,6 +34,8 @@ pub enum UiEvent {
         file_id: u32,
         download_ip: String,
     },
+    //接受到消息
+    AppendingMessages(Vec<NewMessage>),
     Quit,
 }
 

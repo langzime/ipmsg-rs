@@ -11,7 +11,7 @@ export component ChatWindow inherits Rectangle {
     NoMessage {
         visible: ListViewPageAdapter.msgs.length <= 0;
     }
-    Flickable {
+    v := Flickable {
         viewport-width: parent.width;
         width: parent.width;
         height: parent.height;
@@ -55,6 +55,5 @@ export component ChatWindow inherits Rectangle {
             }
         }
     }
-    
-    
+
 }

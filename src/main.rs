@@ -16,8 +16,8 @@ slint::include_modules!();
 use crate::events::model::model_run;
 use crate::front::ui_worker::UiWorker;
 use crate::store::establish_connection;
-use crate::store::logic::db_init;
-use crate::store::models::Messages;
+use crate::store::logic::{db_init, list_latest_messages};
+use crate::store::models::{Messages, NewMessage};
 use anyhow::Result;
 use diesel::prelude::*;
 use log::{debug, info, warn};
@@ -47,6 +47,22 @@ fn main() -> Result<()> {
                     }
                     the_model.set_row_data(i, u);
                 }
+            }
+            let the_model = msgs.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<Msg> fail!");
+            the_model.clear();
+            //显示历史消息
+            if !selected_user_id.is_empty() {
+                let db_messages = list_latest_messages(selected_user_id.to_string(), 20).expect("查询数据库失败！");
+                let ui_msgs = db_messages
+                    .iter()
+                    .map(|x| Msg {
+                        image_url: Default::default(),
+                        name: x.sender_name.to_string().into(),
+                        text: x.content.to_string().into(),
+                        userId: x.sender_name.to_string().into(),
+                    })
+                    .collect::<Vec<_>>();
+                the_model.set_vec(ui_msgs);
             }
         });
     });

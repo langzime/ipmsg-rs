@@ -4,6 +4,7 @@ pub mod schema;
 
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+use log::debug;
 use once_cell::sync::Lazy;
 
 pub static GLOBAL_POOL: Lazy<Pool<ConnectionManager<SqliteConnection>>> = Lazy::new(|| {
@@ -32,7 +33,7 @@ pub fn establish_connection(database_url: &str) -> SqliteConnection {
 }
 
 pub fn get_connection_pool(database_url: &str) -> Pool<ConnectionManager<SqliteConnection>> {
-    println!("database_url:{}", database_url);
+    debug!("database_url:{}", database_url);
     let manager = ConnectionManager::<SqliteConnection>::new(database_url);
     Pool::builder().test_on_check_out(true).build(manager).expect("Could not build connection pool")
 }

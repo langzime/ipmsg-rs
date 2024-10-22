@@ -79,8 +79,8 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                             println!("OpenOrReOpenChatWindow1: {:?} {:?} {:?}", name, ip, packet);
                             if let Some(Packet{additional_section: Some(additional_section), ..}) = packet {
                                 let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
-                                    let users = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
-                                    let the_model = users.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<User> fail!");
+                                    let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
+                                    let the_model = msgs.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<User> fail!");
                                     let additions = additional_section.split("\0").collect::<Vec<_>>();
                                     let msg = Msg {
                                         image_url: Default::default(),
@@ -95,6 +95,29 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                         UiEvent::DisplaySelfSendMsgInHis { .. } => {}
                         UiEvent::DisplayReceivedMsgInHis { .. } => {}
                         UiEvent::RemoveInReceivedList { .. } => {}
+                        UiEvent::AppendingMessages(messages) => {
+                            let msg = messages.get(0).unwrap();
+                            let msg_user_id = msg.sender_id.clone();
+                            println!("{}, {:?}", msg_user_id, messages.clone());
+                            let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
+                                let user_id = ipmsg_ui.global::<ListViewPageAdapter>().get_user_id();
+                                let selected_user = user_id.as_str();
+                                println!("---- {} {}", selected_user, msg_user_id);
+                                if selected_user == msg_user_id.clone() {
+                                    let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
+                                    let the_model = msgs.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<User> fail!");
+                                    for m in messages {
+                                        let msg = Msg {
+                                            image_url: Default::default(),
+                                            name: m.sender_name.into(),
+                                            text: m.content.into(),
+                                            userId: m.sender_id.into()
+                                        };
+                                        the_model.push(msg);
+                                    }
+                                }
+                            });
+                        }
                         _ => {
                             println!("unknown event: {:?}", msg);
                         }

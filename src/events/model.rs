@@ -1,9 +1,12 @@
 use crate::constants::protocol;
+use crate::constants::protocol::{get_host_name, HOST_NAME, LOCAL_IP};
 use crate::core::download::{ManagerPool, PoolFile};
 use crate::core::fileserver::FileServer;
 use crate::core::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::models::event::{ModelEvent, UiEvent};
 use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
+use crate::store::logic::insert_message;
+use crate::store::models::NewMessage;
 use crate::util::packet_parser;
 use anyhow::Result;
 use chrono::prelude::*;
@@ -119,16 +122,48 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>
                 ModelEvent::ReceivedMsg { msg } => {
                     let name = msg.clone().packet.unwrap().sender_name;
                     let ip = msg.clone().ip.clone();
-                    let additional_section = msg.clone().packet.unwrap().additional_section.unwrap();
+                    let packet_no = msg.clone().packet.unwrap().packet_no;
+                    let ver = msg.clone().packet.unwrap().ver;
+                    let additional_section = msg.clone().packet.unwrap().additional_section.unwrap().clone();
                     let v: Vec<&str> = additional_section.split('\0').into_iter().collect();
-                    ui_event_sender
-                        .send(UiEvent::DisplayReceivedMsgInHis {
-                            from_ip: ip.clone(),
-                            name: name.clone(),
-                            context: v[0].to_owned(),
-                            files: msg.opt_files.unwrap_or(vec![]),
-                        })
-                        .unwrap();
+                    let context = v[0].to_owned();
+                    let files = msg.opt_files.unwrap_or(vec![]);
+                    let mut messages = Vec::new();
+                    for r_file in files {
+                        if let Ok(json_str) = serde_json::to_string(&r_file) {
+                            let file_message = NewMessage {
+                                ver: ver.clone(),
+                                message_id: packet_no.clone(),
+                                msg_type: 1,
+                                sender_id: ip.clone(),
+                                sender_name: name.clone(),
+                                receiver_id: LOCAL_IP.clone(),
+                                receiver_name: HOST_NAME.clone(),
+                                group_id: "".to_string(),
+                                is_self: false,
+                                content: json_str,
+                                is_read: false,
+                            };
+                            messages.push(file_message.clone());
+                            insert_message(file_message).expect("insert insert_message fail!");
+                        }
+                    }
+                    let text_message = NewMessage {
+                        ver: ver.clone(),
+                        message_id: packet_no,
+                        msg_type: 0,
+                        sender_id: ip.clone(),
+                        sender_name: name,
+                        receiver_id: LOCAL_IP.clone(),
+                        receiver_name: HOST_NAME.clone(),
+                        group_id: "".to_string(),
+                        is_self: false,
+                        content: context,
+                        is_read: false,
+                    };
+                    messages.push(text_message.clone());
+                    insert_message(text_message).expect("insert insert_message fail!");
+                    ui_event_sender.send(UiEvent::AppendingMessages(messages)).expect("send message fail!");
                 }
                 ModelEvent::SendOneMsg { to_ip, packet, context, files } => {
                     let addr: String = format!("{}:{}", to_ip, protocol::IPMSG_DEFAULT_PORT);
