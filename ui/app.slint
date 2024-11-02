@@ -1,6 +1,7 @@
 import { Button, VerticalBox, ListView, HorizontalBox } from "std-widgets.slint";
 import { ChatWindow, ToolBar, UserList, UserListAdapter } from "./views/index.slint";
 import { ROOT_GLOBAL, ListViewPageAdapter, User } from "./global.slint";
+import { ListViewPageAdapter, User } from "./global.slint";
 
 export { ListViewPageAdapter, User }
 export { UserList, UserListAdapter }
@@ -11,13 +12,17 @@ export component IpmsgUI inherits Window {
     title: @tr("ipmsg");
 
     HorizontalLayout {
-        alignment: start;
         ToolBar {
         }
         UserList {  
         }
-        ChatWindow {
+        VerticalBox {
+            spacing: 0px;
+            padding: 0px;
+            ChatWindow {}
+            Rectangle {
+                background: yellow;
+            }
         }
-
     }
 }
