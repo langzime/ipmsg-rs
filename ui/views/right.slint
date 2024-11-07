@@ -1,4 +1,74 @@
+import { TextEdit, VerticalBox, ListView } from "std-widgets.slint";
+import { ListViewPageAdapter, User } from ".././global.slint";
+import { NoMessage } from "./no_message.slint";
+
+export component ChatWindow inherits Rectangle {
+    min-width: 590px;
+    height: 450px;
+    in-out property viewport-y <=> lv.viewport-y;
+    in-out property viewport-height <=> lv.viewport-height;
+    v := Flickable {
+        viewport-width: parent.width;
+        width: parent.width;
+        height: parent.height;
+
+        public function scroll-down() {
+            if (lv.viewport-height <= lv.visible-height ||
+                    lv.viewport-y <= -lv.viewport-height + lv.visible-height) {
+                return;
+            }
+
+            if (lv.viewport-y - lv.visible-height/4 <= -lv.viewport-height) {
+                lv.viewport-y = -lv.viewport-height + lv.visible-height;
+            } else {
+                lv.viewport-y = lv.viewport-y - lv.visible-height/4;
+            }
+        }
+        public pure function dyn_height(input_height: length) -> length {
+            if (input_height >= 60px) { return input_height; } else {60px}
+        }
+        lv := ListView {
+            for data[index] in ListViewPageAdapter.msgs : Rectangle {
+                background: darkgrey;
+                height: dyn_height(a.preferred-height + 10px);
+                preferred-height: 50px;
+                width: 580px;
+                Image {
+                    x: 10px; y: 10px;
+                    width: 40px;
+                    height: 40px;
+                    source: @image-url("../../resources/head.png");
+                }
+                a := Text {
+                    x: 60px; y:10px;
+                    font-size: 14px;
+                    width: parent.width - 60px;
+                    text: data.text;
+                    wrap: TextWrap.word-wrap;
+                    overflow: TextOverflow.clip;
+                    color: yellow;
+                }
+            }
+        }
+    }
+
+}
 
 export component Right inherits Rectangle {
+    VerticalBox {
+        spacing: 0px;
+        padding: 0px;
+        ChatWindow {
+            visible: ListViewPageAdapter.user_id != "";
+        }
+        Rectangle {
+            visible: ListViewPageAdapter.user_id != "";
+            background: lightgrey;
+            border-color: grey;
+        }
+    }
 
+    NoMessage {
+        visible: ListViewPageAdapter.user_id == "";
+    }
 }
