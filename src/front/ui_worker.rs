@@ -1,10 +1,10 @@
 use crate::models::event::{ModelEvent, UiEvent};
 use crate::models::model::Packet;
 use crate::{IpmsgUI, ListViewPageAdapter, Msg, User};
-use chrono::Local;
 use slint::ComponentHandle;
 use slint::{Model, VecModel, Weak};
 use std::time::Duration;
+use time::OffsetDateTime;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::interval;
 
@@ -59,7 +59,7 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                                 let users = ipmsg_ui.global::<ListViewPageAdapter>().get_users();
                                 let the_model = users.as_any().downcast_ref::<VecModel<User>>().expect("downcast_ref VecModel<User> fail!");
                                 let u_opt = the_model.iter().find(|u| u.userId == user.ip);
-                                let timestamp_now = Local::now().timestamp();
+                                let timestamp_now = OffsetDateTime::now_utc().unix_timestamp();
                                 if u_opt.is_none() {
                                     println!("新上线用户：{}", user.ip);
                                     let user = User {

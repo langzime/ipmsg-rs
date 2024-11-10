@@ -1,26 +1,30 @@
-use chrono::prelude::*;
-use log::info;
+use crate::constants::protocol::{IPMSG_FILEATTACHOPT, IPMSG_SENDMSG};
 use crate::models::model::{self, Packet};
-use crate::constants::protocol::{IPMSG_SENDMSG, IPMSG_FILEATTACHOPT};
+use log::info;
+use time::OffsetDateTime;
 
-pub fn create_sendmsg(context :String, files: Vec<model::FileInfo>, tar_ip: String) -> (Packet, Option<model::ShareInfo>){
-    let commond = if files.len() > 0 { IPMSG_SENDMSG|IPMSG_FILEATTACHOPT } else { IPMSG_SENDMSG };//如果有文件，需要扩展文件
-    let share_info = if files.len() > 0 {
+pub fn create_sendmsg(context: String, file_opt: Option<model::FileInfo>, tar_ip: String) -> (Packet, Option<model::ShareInfo>) {
+    let commond = if file_opt.is_some() {
+        IPMSG_SENDMSG | IPMSG_FILEATTACHOPT
+    } else {
+        IPMSG_SENDMSG
+    }; //如果有文件，需要扩展文件
+    let share_info = if let Some(f) = file_opt.clone() {
         Some(model::ShareInfo {
-            packet_no: Local::now().timestamp() as u32,
+            packet_no: OffsetDateTime::now_utc().unix_timestamp(),
             host: tar_ip.clone(),
             host_cnt: 1,
-            file_info: files.clone(),
+            file_info: vec![f.clone()],
             file_cnt: 1,
-            attach_time: Local::now().time(),
+            attach_time: OffsetDateTime::now_utc(),
         })
-    }else {
+    } else {
         None
     };
 
     let mut additional = String::new();
-    for (i, file) in files.iter().enumerate() {
-        additional.push_str(file.to_fileinfo_msg().as_str());
+    if let Some(f) = file_opt {
+        additional.push_str(f.to_fileinfo_msg().as_str());
         additional.push('\u{7}');
     }
     let mut context1: String = context.to_owned();
@@ -29,5 +33,5 @@ pub fn create_sendmsg(context :String, files: Vec<model::FileInfo>, tar_ip: Stri
     context1.push('\u{0}');
     let packet = Packet::new(commond, Some(context1));
     info!("send message {:?}", packet);
-    return (packet, share_info);
+    (packet, share_info)
 }

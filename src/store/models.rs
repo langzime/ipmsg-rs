@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+use time::{OffsetDateTime, PrimitiveDateTime};
 
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::store::schema::messages)]
@@ -16,8 +17,8 @@ pub struct Messages {
     pub is_self: bool,
     pub content: String,
     pub is_read: bool,
-    pub created_at: chrono::NaiveDateTime,
-    pub updated_at: chrono::NaiveDateTime,
+    pub created_at: PrimitiveDateTime,
+    pub updated_at: PrimitiveDateTime,
 }
 
 #[derive(Insertable, Clone, Debug)]

@@ -4,12 +4,12 @@ use crate::core::download::{ManagerPool, PoolFile};
 use crate::core::fileserver::FileServer;
 use crate::core::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::models::event::{ModelEvent, UiEvent};
+use crate::models::message::create_sendmsg;
 use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
 use crate::store::logic::insert_message;
 use crate::store::models::NewMessage;
 use crate::util::packet_parser;
 use anyhow::Result;
-use chrono::prelude::*;
 use combine::parser::Parser;
 use encoding::all::GB18030;
 use encoding::{DecoderTrap, Encoding};
@@ -165,25 +165,43 @@ fn model_event_loop(socket: UdpSocket, ui_event_sender: UnboundedSender<UiEvent>
                     insert_message(text_message).expect("insert insert_message fail!");
                     ui_event_sender.send(UiEvent::AppendingMessages(messages)).expect("send message fail!");
                 }
-                ModelEvent::SendOneMsg { to_ip, packet, context, files } => {
+                ModelEvent::SendTextMsg { to_ip, context } => {
                     let addr: String = format!("{}:{}", to_ip, protocol::IPMSG_DEFAULT_PORT);
                     socket_clone.set_broadcast(false).unwrap();
+                    let (packet, _) = create_sendmsg(context.clone(), None, to_ip);
+                    let mut messages = Vec::new();
+                    let text_message = NewMessage {
+                        ver: "1".to_string(),
+                        message_id: packet.packet_no.clone(),
+                        msg_type: 1,
+                        sender_id: packet.sender_host.clone(),
+                        sender_name: packet.sender_name.clone(),
+                        receiver_id: LOCAL_IP.clone(),
+                        receiver_name: HOST_NAME.clone(),
+                        group_id: "".to_string(),
+                        is_self: false,
+                        content: context.clone(),
+                        is_read: false,
+                    };
+                    messages.push(text_message.clone());
+                    socket_clone
+                        .send_to(crate::util::utf8_to_gb18030(packet.clone().to_string().as_ref()).as_slice(), addr.as_str())
+                        .expect("couldn't send message");
+                    insert_message(text_message).expect("insert insert_message fail!");
+                    ui_event_sender.send(UiEvent::AppendingMessages(messages)).expect("send message fail!");
+                    info!("send SendOneMsg !");
+                }
+                ModelEvent::SendFileMsg { to_ip, file } => {
+                    let addr: String = format!("{}:{}", to_ip, protocol::IPMSG_DEFAULT_PORT);
+                    socket_clone.set_broadcast(false).unwrap();
+                    let (packet, share_info) = create_sendmsg("".to_owned(), file, to_ip);
                     socket_clone
                         .send_to(crate::util::utf8_to_gb18030(packet.to_string().as_ref()).as_slice(), addr.as_str())
                         .expect("couldn't send message");
                     info!("send SendOneMsg !");
-                    ui_event_sender
-                        .send(UiEvent::DisplaySelfSendMsgInHis {
-                            to_ip,
-                            context,
-                            files: files.clone(),
-                        })
-                        .expect("couldn't send message");
-                    {
-                        let mut file_pool = file_server.file_pool.lock().unwrap();
-                        if let Some(file) = files {
-                            file_pool.push(file);
-                        }
+                    let mut file_pool = file_server.file_pool.lock().unwrap();
+                    if let Some(file) = share_info {
+                        file_pool.push(file);
                     }
                 }
                 ModelEvent::DownloadIsBusy { file } => {
@@ -300,7 +318,6 @@ fn model_packet_dispatcher(packet: Packet) -> Result<()> {
                             mmtime_num = (mmtime_num as i64) / 1000;
                         }
                         let file_attr = file_attr[4].parse::<u32>()?; //文件属性
-                        let ntime = DateTime::from_timestamp(mmtime_num, 0);
                         if file_attr == protocol::IPMSG_FILE_REGULAR {
                             info!("i am ipmsg_file_regular");
                         } else if file_attr == protocol::IPMSG_FILE_DIR {

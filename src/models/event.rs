@@ -1,4 +1,4 @@
-use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
+use crate::models::model::{FileInfo, Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
 use crate::store::models::NewMessage;
 use std::path::PathBuf;
 
@@ -67,11 +67,13 @@ pub enum ModelEvent {
     ReceivedMsg {
         msg: ReceivedPacketInner,
     },
-    SendOneMsg {
+    SendTextMsg {
         to_ip: String,
-        packet: Packet,
         context: String,
-        files: Option<ShareInfo>,
+    },
+    SendFileMsg {
+        to_ip: String,
+        file: Option<FileInfo>,
     },
     DownloadIsBusy {
         file: ReceivedSimpleFileInfo,

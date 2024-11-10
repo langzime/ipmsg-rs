@@ -1,31 +1,27 @@
-
-use std::sync::{Mutex, Arc};
-use std::net::{TcpStream, TcpListener};
-use std::thread;
-use std::io::{Read, Write, BufWriter};
-use std::path::PathBuf;
-use std::fs::{self, File, Metadata};
-use encoding::{Encoding, DecoderTrap};
-use encoding::all::GB18030;
-use chrono::prelude::*;
-use log::{info, debug};
-use combine::parser::Parser;
-use crate::models::model::ShareInfo;
-use crate::{constants::protocol, util};
 use crate::constants::protocol::{IPMSG_PACKET_DELIMITER, REPARENT_PATH};
+use crate::models::model::ShareInfo;
 use crate::util::packet_parser;
+use crate::{constants::protocol, util};
+use combine::parser::Parser;
+use encoding::all::GB18030;
+use encoding::{DecoderTrap, Encoding};
+use log::{debug, info};
+use std::fs::{self, File, Metadata};
+use std::io::{BufWriter, Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use time::OffsetDateTime;
 
 #[derive(Clone, Debug)]
 pub struct FileServer {
-    pub file_pool: Arc<Mutex<Vec<ShareInfo>>>
+    pub file_pool: Arc<Mutex<Vec<ShareInfo>>>,
 }
 
 impl FileServer {
-
     pub fn new(file_pool: Arc<Mutex<Vec<ShareInfo>>>) -> FileServer {
-        FileServer{
-            file_pool
-        }
+        FileServer { file_pool }
     }
 
     pub fn run(&self) {
@@ -53,14 +49,14 @@ impl FileServer {
                             let cmd = protocol::get_mode(packet.command_no);
                             if packet.additional_section.is_some() {
                                 if cmd == protocol::IPMSG_GETFILEDATA {
-                                        //文件请求
+                                    //文件请求
                                     FileServer::process_file(&pool_tmp, &mut stream_echo, packet.additional_section.unwrap())
-                                }else if cmd == protocol::IPMSG_GETDIRFILES {
+                                } else if cmd == protocol::IPMSG_GETDIRFILES {
                                     FileServer::process_dir(pool_tmp, stream_echo, packet.additional_section.unwrap())
-                                }else {
+                                } else {
                                     info!("Invalid packet tcp file cmd {:?} !", tmp_str);
                                 }
-                            }else{
+                            } else {
                                 info!("Invalid packet additional_section is none {:?} !", tmp_str);
                             }
                         }
@@ -74,10 +70,14 @@ impl FileServer {
     }
 
     fn process_dir(pool_tmp: Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: TcpStream, ext_str: String) -> () {
-        let file_attr = ext_str.splitn(3, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+        let file_attr = ext_str
+            .splitn(3, |c| c == ':')
+            .into_iter()
+            .filter(|x: &&str| !x.is_empty())
+            .collect::<Vec<&str>>();
         info!("file dir packet parse {:?}", file_attr);
         if file_attr.len() >= 2 {
-            let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
+            let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as i64;
             let file_id = i64::from_str_radix(file_attr[1], 16).unwrap();
             let mut search_result: Option<ShareInfo> = Option::None;
             {
@@ -87,7 +87,7 @@ impl FileServer {
                 search_result = result.cloned();
             }
             if let Some(result_share_file) = search_result {
-                let file_info = result_share_file.file_info.iter().find(|ref f| f.file_id == file_id as u32);
+                let file_info = result_share_file.file_info.iter().find(|ref f| f.file_id == file_id as i64);
                 if let Some(file_info) = file_info {
                     let ref root_path: PathBuf = file_info.file_name;
                     let mut buffer = BufWriter::new(stream_echo.try_clone().unwrap());
@@ -98,7 +98,11 @@ impl FileServer {
     }
 
     fn process_file(pool_tmp: &Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: &mut TcpStream, ext_str: String) -> () {
-        let file_attr = ext_str.splitn(4, |c| c == ':').into_iter().filter(|x: &&str| !x.is_empty()).collect::<Vec<&str>>();
+        let file_attr = ext_str
+            .splitn(4, |c| c == ':')
+            .into_iter()
+            .filter(|x: &&str| !x.is_empty())
+            .collect::<Vec<&str>>();
         info!("file packet parse {:?}", file_attr);
         if file_attr.len() >= 3 {
             let packet_id = i64::from_str_radix(file_attr[0], 16).unwrap() as u32;
@@ -108,17 +112,19 @@ impl FileServer {
             {
                 let search = pool_tmp.lock().unwrap();
                 let ref vec: Vec<ShareInfo> = *search;
-                let result = vec.iter().find(|ref s| s.packet_no == packet_id);
+                let result = vec.iter().find(|ref s| s.packet_no == packet_id as i64);
                 search_result = result.cloned();
             }
             if let Some(result_share_file) = search_result {
-                let file_info = result_share_file.file_info.iter().find(|f| f.file_id == file_id as u32);
+                let file_info = result_share_file.file_info.iter().find(|f| f.file_id == file_id as i64);
                 if let Some(file_info) = file_info {
                     let mut f: File = File::open(&file_info.file_name).unwrap();
                     let mut buf = [0; 1024];
                     let mut buffer = BufWriter::new(stream_echo);
                     while let Ok(bytes_read) = f.read(&mut buf) {
-                        if bytes_read == 0 { break; }
+                        if bytes_read == 0 {
+                            break;
+                        }
                         buffer.write(&buf[..bytes_read]).unwrap();
                         buffer.flush().unwrap();
                     }
@@ -129,8 +135,8 @@ impl FileServer {
 }
 
 //send dir
-pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
-    buffer.write(util::utf8_to_gb18030(&make_header(&root_path, false)).as_slice()).unwrap();//root dir
+pub fn send_dir(root_path: &PathBuf, mut buffer: &mut BufWriter<TcpStream>) {
+    buffer.write(util::utf8_to_gb18030(&make_header(&root_path, false)).as_slice()).unwrap(); //root dir
     debug!("{:?}", make_header(&root_path, false));
     if root_path.is_dir() {
         for sub_path in fs::read_dir(root_path).unwrap() {
@@ -142,11 +148,13 @@ pub fn send_dir(root_path: &PathBuf, mut buffer : & mut BufWriter<TcpStream>) {
                 let mut buf = [0; 1024];
                 let mut f: File = File::open(&sub).unwrap();
                 while let Ok(bytes_read) = f.read(&mut buf) {
-                    if bytes_read == 0 { break; }
+                    if bytes_read == 0 {
+                        break;
+                    }
                     buffer.write(&buf[..bytes_read]).unwrap();
                     buffer.flush().unwrap();
                 }
-            }else {
+            } else {
                 send_dir(&sub, &mut buffer);
             }
         }
@@ -167,9 +175,9 @@ pub fn make_header(path: &PathBuf, ret_parent: bool) -> String {
     if ret_parent {
         file_attr = protocol::IPMSG_FILE_RETPARENT;
         let tmp_file_name = format!("{}", REPARENT_PATH);
-        header.push_str(tmp_file_name.as_str());//filename
+        header.push_str(tmp_file_name.as_str()); //filename
         file_size = 0;
-    }else{
+    } else {
         let path_metadata: Metadata = fs::metadata(&path).unwrap();
         file_size = path_metadata.len();
         file_name = path.file_name().unwrap().to_str().unwrap();
@@ -184,11 +192,20 @@ pub fn make_header(path: &PathBuf, ret_parent: bool) -> String {
     }
 
     header.push(IPMSG_PACKET_DELIMITER);
-    header.push_str(format!("{:x}", file_size).as_str());//filesize//
+    header.push_str(format!("{:x}", file_size).as_str()); //filesize//
     header.push(IPMSG_PACKET_DELIMITER);
-    header.push_str(format!("{:x}", file_attr).as_str());//fileattr
-    let timestamp_now = Local::now().timestamp();
-    header.push_str(format!(":{:x}={:x}:{:x}={:x}:", protocol::IPMSG_FILE_CREATETIME, timestamp_now, protocol::IPMSG_FILE_MTIME, timestamp_now).as_str());//
+    header.push_str(format!("{:x}", file_attr).as_str()); //fileattr
+    let timestamp_now = OffsetDateTime::now_utc().unix_timestamp();
+    header.push_str(
+        format!(
+            ":{:x}={:x}:{:x}={:x}:",
+            protocol::IPMSG_FILE_CREATETIME,
+            timestamp_now,
+            protocol::IPMSG_FILE_MTIME,
+            timestamp_now
+        )
+        .as_str(),
+    ); //
     let mut length = util::utf8_to_gb18030(&header).len();
     length = length + format!("{:0>4x}", length).len();
     header.insert_str(0, format!("{:0>4x}", length).as_str());

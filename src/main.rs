@@ -13,8 +13,10 @@ use std::panic;
 
 const APP_ID: &'static str = "com.github.ipmsg-rs";
 slint::include_modules!();
+use crate::core::GLOBLE_SENDER;
 use crate::events::model::model_run;
 use crate::front::ui_worker::UiWorker;
+use crate::models::event::ModelEvent::SendTextMsg;
 use crate::store::establish_connection;
 use crate::store::logic::{db_init, list_latest_messages};
 use crate::store::models::{Messages, NewMessage};
@@ -68,7 +70,14 @@ fn main() -> Result<()> {
     });
 
     let ui_worker = UiWorker::new(&ui);
-
+    ui.global::<Logic>().on_send_msg(|ip, msg_type, text| {
+        GLOBLE_SENDER
+            .send(SendTextMsg {
+                to_ip: ip.to_string(),
+                context: text.to_string(),
+            })
+            .unwrap();
+    });
     let socket: UdpSocket = match UdpSocket::bind(constants::protocol::ADDR.as_str()) {
         Ok(s) => {
             info!("udp server start listening! {:?}", constants::protocol::ADDR.as_str());

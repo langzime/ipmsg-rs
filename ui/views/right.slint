@@ -1,5 +1,5 @@
-import { TextEdit, VerticalBox, ListView } from "std-widgets.slint";
-import { ListViewPageAdapter, User } from ".././global.slint";
+import { TextEdit, ListView, Button } from "std-widgets.slint";
+import { ListViewPageAdapter, User, Logic } from "../global.slint";
 import { NoMessage } from "./no_message.slint";
 
 export component ChatWindow inherits Rectangle {
@@ -54,17 +54,41 @@ export component ChatWindow inherits Rectangle {
 
 }
 
+export component SendBox inherits Rectangle {
+    in-out property <string> pre_send_text <=> te.text;
+    te := TextEdit {
+        font-size: 14px;
+        width: parent.width;
+        height: parent.height;
+        text: "";
+        wrap: word-wrap;
+    }
+}
+
 export component Right inherits Rectangle {
-    VerticalBox {
-        spacing: 0px;
-        padding: 0px;
+    in-out property <string> pre_send_text <=> sb.pre_send_text;
+    VerticalLayout {
+        visible: ListViewPageAdapter.user_id != "";
         ChatWindow {
-            visible: ListViewPageAdapter.user_id != "";
         }
-        Rectangle {
-            visible: ListViewPageAdapter.user_id != "";
+        sb := SendBox {
             background: lightgrey;
             border-color: grey;
+        }
+        HorizontalLayout {
+            alignment: end;
+            Button {
+                text: "发送";
+                width: 150px;
+                primary: true;
+                enabled: pre_send_text != "";
+                clicked => {
+                    if (ListViewPageAdapter.user_id != "") {
+                        Logic.send_msg(ListViewPageAdapter.user_id, 1, pre_send_text);
+                        pre_send_text = "";
+                    }
+                }
+            }
         }
     }
 
@@ -72,3 +96,6 @@ export component Right inherits Rectangle {
         visible: ListViewPageAdapter.user_id == "";
     }
 }
+
+
+
