@@ -1,6 +1,7 @@
 use crate::models::event::{ModelEvent, UiEvent};
 use crate::models::model::Packet;
 use crate::{IpmsgUI, ListViewPageAdapter, Msg, User};
+use anyhow::{anyhow, Result};
 use slint::ComponentHandle;
 use slint::{Model, VecModel, Weak};
 use std::time::Duration;
@@ -23,9 +24,10 @@ impl UiWorker {
         Self { channel, worker_thread }
     }
 
-    pub fn join(self) -> std::thread::Result<()> {
+    pub fn join(self) -> Result<()> {
         let _ = self.channel.send(UiEvent::Quit);
-        self.worker_thread.join()
+        self.worker_thread.join().unwrap();
+        Ok(())
     }
 }
 

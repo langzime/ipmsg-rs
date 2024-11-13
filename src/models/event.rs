@@ -90,3 +90,13 @@ pub enum ModelEvent {
     },
     PutInTcpFilePool(),
 }
+
+pub enum UdpEvent {
+    Quit,
+    Bytes(Vec<u8>),
+}
+
+pub enum TcpEvent {
+    Quit,
+    Bytes(Vec<u8>),
+}

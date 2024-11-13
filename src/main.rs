@@ -7,25 +7,17 @@ mod front;
 mod models;
 mod store;
 mod util;
-// use human_panic::{setup_panic, Metadata};
-use std::net::UdpSocket;
-use std::panic;
 
 const APP_ID: &'static str = "com.github.ipmsg-rs";
 slint::include_modules!();
+use crate::core::net_worker::UdpWorker;
 use crate::core::GLOBLE_SENDER;
-use crate::events::model::model_run;
 use crate::front::ui_worker::UiWorker;
 use crate::models::event::ModelEvent::SendTextMsg;
-use crate::store::establish_connection;
 use crate::store::logic::{db_init, list_latest_messages};
-use crate::store::models::{Messages, NewMessage};
 use anyhow::Result;
 use diesel::prelude::*;
-use log::{debug, info, warn};
-use slint::format;
-use slint::{Color, Model, ModelRc, StandardListViewItem, VecModel, Weak};
-use std::rc::Rc;
+use slint::{Model, VecModel};
 
 fn main() -> Result<()> {
     let config_str = include_str!("../config/log4rs.yaml");
@@ -78,14 +70,9 @@ fn main() -> Result<()> {
             })
             .unwrap();
     });
-    let socket: UdpSocket = match UdpSocket::bind(constants::protocol::ADDR.as_str()) {
-        Ok(s) => {
-            info!("udp server start listening! {:?}", constants::protocol::ADDR.as_str());
-            s
-        }
-        Err(e) => panic!("couldn't bind socket: {}", e),
-    };
-    model_run(socket, ui_worker.channel.clone());
+    let udp_worker = UdpWorker::new(ui_worker.channel.clone());
     ui.run()?;
+    ui_worker.join();
+    udp_worker.join();
     Ok(())
 }

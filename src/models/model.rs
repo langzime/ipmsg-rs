@@ -5,7 +5,6 @@ use std::fmt::Display;
 use std::fs;
 use std::fs::Metadata;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 use time::OffsetDateTime;
 
 ///
@@ -28,12 +27,6 @@ pub struct Packet {
     pub ip: String,
 }
 
-type ExtStr = String;
-
-trait ExtMsg {
-    fn to_ext_msg() -> ExtStr;
-}
-
 #[derive(Default)]
 pub struct PacketBuilder {
     ///版本好 标准协议为1
@@ -48,28 +41,6 @@ pub struct PacketBuilder {
     pub command_no: u32,
     ///扩展命令
     pub ext_commands: Vec<u32>,
-}
-
-impl PacketBuilder {
-    ///命令
-    fn command(command_no: u32) -> PacketBuilder {
-        let mut packet_builder: PacketBuilder = Default::default();
-        packet_builder.ver = format!("{}", IPMSG_VERSION);
-        packet_builder.packet_no = format!("{}", OffsetDateTime::now_utc().unix_timestamp());
-        packet_builder.sender_name = protocol::HOST_NAME.clone();
-        packet_builder.sender_host = protocol::HOST_NAME.clone();
-        packet_builder.command_no = command_no;
-        packet_builder
-    }
-    ///扩展命令
-    fn command_opt(mut self, ext_command_no: u32) -> PacketBuilder {
-        self.ext_commands.push(ext_command_no);
-        self
-    }
-
-    /*fn finish(&self) -> Packet {
-
-    }*/
 }
 
 impl Packet {
