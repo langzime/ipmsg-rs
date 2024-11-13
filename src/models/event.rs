@@ -93,7 +93,8 @@ pub enum ModelEvent {
 
 pub enum UdpEvent {
     Quit,
-    Bytes(Vec<u8>),
+    Bytes((Vec<u8>, String)),
+    BytesWithBroadcast(Vec<u8>),
 }
 
 pub enum TcpEvent {

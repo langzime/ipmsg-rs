@@ -1,5 +1,5 @@
 use crate::constants::protocol;
-use crate::constants::protocol::{HOST_NAME, IPMSG_PACKET_DELIMITER, LOCAL_IP, REPARENT_PATH};
+use crate::constants::protocol::{HOST_NAME, IPMSG_DEFAULT_PORT, IPMSG_LIMITED_BROADCAST, IPMSG_PACKET_DELIMITER, LOCAL_IP, REPARENT_PATH};
 use crate::core::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::models::event::{ModelEvent, TcpEvent, UdpEvent, UiEvent};
 use crate::models::message::create_sendmsg;
@@ -34,7 +34,10 @@ pub struct UdpWorker {
 impl UdpWorker {
     pub fn new(ui_event_sender: UnboundedSender<UiEvent>) -> Self {
         let (channel, r) = mpsc::unbounded_channel();
-        let worker_thread = std::thread::spawn({ move || tokio::runtime::Runtime::new().unwrap().block_on(udp_loop(r, ui_event_sender)).unwrap() });
+        let worker_thread = std::thread::spawn({
+            let channel = channel.clone();
+            move || tokio::runtime::Runtime::new().unwrap().block_on(udp_loop(r, ui_event_sender, channel)).unwrap()
+        });
         UdpWorker { worker_thread, channel }
     }
 
@@ -43,9 +46,18 @@ impl UdpWorker {
         self.worker_thread.join().unwrap();
         Ok(())
     }
+
+    pub fn send_ipmsg_br_entry(&self) -> Result<()> {
+        let packet = Packet::new(
+            protocol::IPMSG_BR_ENTRY | protocol::IPMSG_BROADCASTOPT,
+            Some(format!("{}\0\n{}", *HOST_NAME, *HOST_NAME)),
+        );
+        self.channel.clone().send(UdpEvent::BytesWithBroadcast(packet.to_string().into_bytes()))?;
+        Ok(())
+    }
 }
 
-async fn udp_loop(mut r: UnboundedReceiver<UdpEvent>, ui_event_sender: UnboundedSender<UiEvent>) -> Result<()> {
+async fn udp_loop(mut r: UnboundedReceiver<UdpEvent>, ui_event_sender: UnboundedSender<UiEvent>, udp_event_send: UnboundedSender<UdpEvent>) -> Result<()> {
     let socket = match UdpSocket::bind(protocol::ADDR.as_str()).await {
         Ok(s) => {
             info!("udp server start listening! {:?}", protocol::ADDR.as_str());
@@ -66,7 +78,7 @@ async fn udp_loop(mut r: UnboundedReceiver<UdpEvent>, ui_event_sender: Unbounded
                         info!("receive raw message -> {:?} from ip -> {:?}", receive_str, addr.ip());
                         if let Ok((mut packet, _)) = packet_parser().parse(receive_str.as_str()) {
                             packet.ip = addr.ip().to_string();
-                            model_packet_dispatcher(packet, ui_event_sender.clone())?;
+                            model_packet_dispatcher(packet, ui_event_sender.clone(), udp_event_send.clone())?;
                         } else {
                             error!("packet parser fail!");
                         }
@@ -79,13 +91,36 @@ async fn udp_loop(mut r: UnboundedReceiver<UdpEvent>, ui_event_sender: Unbounded
                 if let Some(event) = udp_res {
                     match event {
                         UdpEvent::Quit => {
+                            debug!("udp_loop quit!");
                             break;
                         }
-                        UdpEvent::Bytes(bytes) => {
-                            match soc_w.send(&*bytes).await {
+                        UdpEvent::Bytes((bytes, ip)) => {
+                            let addr:String = format!("{}:{}", ip, IPMSG_DEFAULT_PORT);
+                            match soc_w.set_broadcast(false) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!("soc_w set_broadcast failed!! {e}");
+                                }
+                            }
+                            match soc_w.send_to(&*bytes, &addr).await {
                                 Ok(_size) => {}
                                 Err(e) => {
-                                    error!("soc_w send failed!! {e}");
+                                    error!("soc_w send failed!! {e} {ip}");
+                                }
+                            };
+                        }
+                        UdpEvent::BytesWithBroadcast(bytes) => {
+                            let addr:String = format!("{}:{}", IPMSG_LIMITED_BROADCAST, IPMSG_DEFAULT_PORT);
+                            match soc_w.set_broadcast(true) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!("soc_w set_broadcast failed!! {e}");
+                                }
+                            }
+                            match soc_w.send_to(&*bytes, &addr).await {
+                                Ok(_size) => {}
+                                Err(e) => {
+                                    error!("soc_w send failed!! {e} {addr}");
                                 }
                             };
                         }
@@ -97,7 +132,7 @@ async fn udp_loop(mut r: UnboundedReceiver<UdpEvent>, ui_event_sender: Unbounded
     Ok(())
 }
 
-pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<UiEvent>) -> Result<()> {
+pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<UiEvent>, udp_event_send: UnboundedSender<UdpEvent>) -> Result<()> {
     let mut extstr = String::new();
     if let Some(ref additional_section) = packet.additional_section {
         extstr = additional_section.to_owned();
@@ -107,33 +142,25 @@ pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<
 
     if opt & protocol::IPMSG_SENDCHECKOPT != 0 {
         let recvmsg = Packet::new(protocol::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
-        GLOBLE_SENDER.send(ModelEvent::RecMsgReply {
-            packet: recvmsg,
-            from_ip: packet.ip.to_owned(),
-        })?;
+        udp_event_send.send(UdpEvent::Bytes((recvmsg.to_string().into_bytes(), packet.ip.clone())))?;
     }
     if cmd == protocol::IPMSG_BR_EXIT {
         //收到下线通知消息
-        GLOBLE_SENDER.send(ModelEvent::BroadcastExit(packet.sender_host.to_owned()))?;
+        ui_event_sender.send(UiEvent::UserListRemoveOne(packet.ip))?;
     } else if cmd == protocol::IPMSG_BR_ENTRY {
         //收到上线通知消息
         ///扩展段 用户名|用户组
         let ext_vec = extstr.splitn(2, |c| c == ':').collect::<Vec<&str>>();
         let ansentry_packet = Packet::new(protocol::IPMSG_ANSENTRY, None);
-
         let group_name = if ext_vec.len() > 2 { ext_vec[1].to_owned() } else { "".to_owned() };
         let user_name = if ext_vec.len() > 1 && !ext_vec[0].is_empty() {
             ext_vec[0].to_owned()
         } else {
             packet.sender_name.clone()
         };
-
         let user = User::new(user_name, packet.sender_host.to_owned(), packet.ip.to_owned(), group_name);
-        info!("{user:?}");
-        GLOBLE_SENDER.send(ModelEvent::RecOnlineMsgReply {
-            packet: ansentry_packet,
-            from_user: user,
-        })?;
+        udp_event_send.send(UdpEvent::Bytes((ansentry_packet.to_string().into_bytes(), packet.ip.clone())))?;
+        ui_event_sender.send(UiEvent::UserListAddOne(user))?;
     } else if cmd == protocol::IPMSG_ANSENTRY {
         //通报新上线
         let user = User::new(
@@ -142,7 +169,7 @@ pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<
             packet.ip.to_owned(),
             "".to_owned(),
         );
-        GLOBLE_SENDER.send(ModelEvent::NotifyOnline { user })?;
+        ui_event_sender.send(UiEvent::UserListAddOne(user))?;
     } else if cmd == protocol::IPMSG_SENDMSG {
         //收到发送的消息
         //文字消息|文件扩展段
@@ -202,9 +229,50 @@ pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<
                 }
             };
         }
-        let packet_clone = packet.clone();
-        let received_packet_inner = ReceivedPacketInner::new(packet.ip.to_owned()).packet(packet_clone).option_opt_files(files_opt);
-        GLOBLE_SENDER.send(ModelEvent::ReceivedMsg { msg: received_packet_inner })?;
+        let name = packet.sender_name.clone();
+        let ip = packet.ip.clone();
+        let packet_no = packet.packet_no;
+        let ver = packet.ver;
+        let additional_section = packet.additional_section.unwrap().clone();
+        let v: Vec<&str> = additional_section.split('\0').into_iter().collect();
+        let context = v[0].to_owned();
+        let files = files_opt.unwrap_or(vec![]);
+        let mut messages = Vec::new();
+        for r_file in files {
+            if let Ok(json_str) = serde_json::to_string(&r_file) {
+                let file_message = NewMessage {
+                    ver: ver.clone(),
+                    message_id: packet_no.clone(),
+                    msg_type: 1,
+                    sender_id: ip.clone(),
+                    sender_name: name.clone(),
+                    receiver_id: LOCAL_IP.clone(),
+                    receiver_name: HOST_NAME.clone(),
+                    group_id: "".to_string(),
+                    is_self: false,
+                    content: json_str,
+                    is_read: false,
+                };
+                messages.push(file_message.clone());
+                insert_message(file_message).expect("insert insert_message fail!");
+            }
+        }
+        let text_message = NewMessage {
+            ver: ver.clone(),
+            message_id: packet_no,
+            msg_type: 0,
+            sender_id: ip.clone(),
+            sender_name: name,
+            receiver_id: LOCAL_IP.clone(),
+            receiver_name: HOST_NAME.clone(),
+            group_id: "".to_string(),
+            is_self: false,
+            content: context,
+            is_read: false,
+        };
+        messages.push(text_message.clone());
+        insert_message(text_message).expect("insert insert_message fail!");
+        ui_event_sender.send(UiEvent::AppendingMessages(messages)).expect("send message fail!");
     } else if cmd == protocol::IPMSG_NOOPERATION {
         info!("i am IPMSG_NOOPERATION");
     } else if cmd == protocol::IPMSG_BR_ABSENCE {
@@ -237,7 +305,8 @@ impl TcpWorker {
 
 async fn tcp_loop(mut r: UnboundedReceiver<TcpEvent>) -> Result<()> {
     let listener = TcpListener::bind("127.0.0.1:8080").await?;
-    for (mut stream, addr) in listener.accept().await {
+    loop {
+        let (mut stream, addr) = listener.accept().await?;
         tokio::spawn(async move {
             let mut buf = [0; 2048];
             let byte_size = stream.read(&mut buf[..]).await.unwrap();
@@ -251,9 +320,19 @@ async fn tcp_loop(mut r: UnboundedReceiver<TcpEvent>) -> Result<()> {
                     if packet.additional_section.is_some() {
                         if cmd == protocol::IPMSG_GETFILEDATA {
                             //文件请求
-                            //FileServer::process_file(&pool_tmp, &mut stream_echo, packet.additional_section.unwrap())
+                            match process_file(stream, packet.additional_section.unwrap()).await {
+                                Err(err) => {
+                                    error!("{err}")
+                                }
+                                _ => {}
+                            };
                         } else if cmd == protocol::IPMSG_GETDIRFILES {
-                            //FileServer::process_dir(pool_tmp, stream_echo, packet.additional_section.unwrap())
+                            match process_dir(stream, packet.additional_section.unwrap()).await {
+                                Err(err) => {
+                                    error!("{err}")
+                                }
+                                _ => {}
+                            }
                         } else {
                             info!("Invalid packet tcp file cmd {:?} !", tmp_str);
                         }
@@ -270,7 +349,7 @@ async fn tcp_loop(mut r: UnboundedReceiver<TcpEvent>) -> Result<()> {
     Ok(())
 }
 
-async fn process_file(pool_tmp: &Arc<Mutex<Vec<ShareInfo>>>, stream_echo: &mut TcpStream, ext_str: String) -> Result<()> {
+async fn process_file(stream_echo: TcpStream, ext_str: String) -> Result<()> {
     let file_attr = ext_str
         .splitn(4, |c| c == ':')
         .into_iter()
@@ -283,15 +362,14 @@ async fn process_file(pool_tmp: &Arc<Mutex<Vec<ShareInfo>>>, stream_echo: &mut T
         let offset = file_attr[2].parse::<u32>()?;
         let mut search_result: Option<ShareInfo> = None;
         {
-            let search = pool_tmp.lock()?;
-            let ref vec: Vec<ShareInfo> = *search;
-            let result = vec.iter().find(|ref s| s.packet_no == packet_id as i64);
-            search_result = result.cloned();
+            let search = FILE_LIST.lock().expect("获取锁失败！");
+            let result = search.iter().find(|ref s| s.packet_no == packet_id as i64);
+            search_result = result.cloned().clone();
         }
         if let Some(result_share_file) = search_result {
             let file_info = result_share_file.file_info.iter().find(|f| f.file_id == file_id);
             if let Some(file_info) = file_info {
-                let mut f: File = File::open(&file_info.file_name)?;
+                let mut f = File::open(&file_info.file_name).await?;
                 let mut buf = [0; 1024];
                 let mut buffer = BufWriter::new(stream_echo);
                 while let Ok(bytes_read) = f.read(&mut buf).await {
@@ -307,7 +385,7 @@ async fn process_file(pool_tmp: &Arc<Mutex<Vec<ShareInfo>>>, stream_echo: &mut T
     Ok(())
 }
 
-async fn process_dir(pool_tmp: Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: TcpStream, ext_str: String) -> Result<()> {
+async fn process_dir(stream_echo: TcpStream, ext_str: String) -> Result<()> {
     let file_attr = ext_str
         .splitn(3, |c| c == ':')
         .into_iter()
@@ -319,15 +397,14 @@ async fn process_dir(pool_tmp: Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: TcpS
         let file_id = i64::from_str_radix(file_attr[1], 16)?;
         let mut search_result: Option<ShareInfo> = Option::None;
         {
-            let search = pool_tmp.lock()?;
-            let ref vec: Vec<ShareInfo> = *search;
-            let result = vec.iter().find(|ref s| s.packet_no == packet_id);
+            let search = FILE_LIST.lock().expect("获取锁失败！");
+            let result = search.iter().find(|ref s| s.packet_no == packet_id);
             search_result = result.cloned();
         }
         if let Some(result_share_file) = search_result {
             let file_info = result_share_file.file_info.iter().find(|ref f| f.file_id == file_id);
             if let Some(file_info) = file_info {
-                let ref root_path: PathBuf = file_info.file_name;
+                let ref root_path = file_info.file_name;
                 let mut buffer = BufWriter::new(stream_echo);
                 send_dir(root_path, &mut buffer).await?;
             }
@@ -337,8 +414,8 @@ async fn process_dir(pool_tmp: Arc<Mutex<Vec<ShareInfo>>>, mut stream_echo: TcpS
 }
 
 pub async fn send_dir(root_path: &PathBuf, mut buffer: &mut BufWriter<TcpStream>) -> Result<()> {
-    buffer.write(util::utf8_to_gb18030(&make_header(&root_path, false)).as_slice()).await?;
-    debug!("{:?}", make_header(&root_path, false));
+    buffer.write(util::utf8_to_gb18030(&make_header(&root_path, false).await?).as_slice()).await?;
+    debug!("{:?}", make_header(&root_path, false).await?);
     if root_path.is_dir() {
         let mut entries = fs::read_dir(".").await?;
         while let Some(entry) = entries.next_entry().await? {
@@ -348,7 +425,7 @@ pub async fn send_dir(root_path: &PathBuf, mut buffer: &mut BufWriter<TcpStream>
                 buffer.write(util::utf8_to_gb18030(&header).as_slice()).await?;
                 info!("{:?}", header);
                 let mut buf = [0; 1024];
-                let mut f: File = File::open(&sub).await.unwrap();
+                let mut f = File::open(&sub).await.unwrap();
                 while let Ok(bytes_read) = f.read(&mut buf).await {
                     if bytes_read == 0 {
                         break;
@@ -361,8 +438,8 @@ pub async fn send_dir(root_path: &PathBuf, mut buffer: &mut BufWriter<TcpStream>
             }
         }
     }
-    let ret_parent = crate::core::fileserver::make_header(root_path, true);
-    buffer.write(ret_parent.as_bytes()).unwrap();
+    let ret_parent = make_header(root_path, true).await?;
+    buffer.write(ret_parent.as_bytes()).await?;
     debug!("{ret_parent:?}");
     Ok(())
 }
@@ -375,13 +452,13 @@ pub async fn make_header(path: &PathBuf, ret_parent: bool) -> Result<String> {
     let file_size;
     let mut header = String::new();
     header.push(IPMSG_PACKET_DELIMITER);
+    let path_metadata = fs::metadata(&path).await?;
     if ret_parent {
         file_attr = protocol::IPMSG_FILE_RETPARENT;
         let tmp_file_name = format!("{}", REPARENT_PATH);
         header.push_str(tmp_file_name.as_str()); //filename
         file_size = 0;
     } else {
-        let path_metadata = fs::metadata(&path).await?;
         file_size = path_metadata.len();
         file_name = path.file_name().unwrap().to_str().unwrap();
         header.push_str(file_name);
@@ -390,22 +467,21 @@ pub async fn make_header(path: &PathBuf, ret_parent: bool) -> Result<String> {
         } else {
             file_attr = protocol::IPMSG_FILE_REGULAR;
         }
-        path_metadata.created();
-        let _ = path_metadata.modified();
     }
+    let create_time = path_metadata.created()?;
+    let modified_time = path_metadata.modified()?;
 
     header.push(IPMSG_PACKET_DELIMITER);
     header.push_str(format!("{:x}", file_size).as_str()); //filesize//
     header.push(IPMSG_PACKET_DELIMITER);
     header.push_str(format!("{:x}", file_attr).as_str()); //fileattr
-    let timestamp_now = OffsetDateTime::now_utc().unix_timestamp();
     header.push_str(
         format!(
             ":{:x}={:x}:{:x}={:x}:",
             protocol::IPMSG_FILE_CREATETIME,
-            timestamp_now,
+            OffsetDateTime::from(create_time).unix_timestamp(),
             protocol::IPMSG_FILE_MTIME,
-            timestamp_now
+            OffsetDateTime::from(modified_time).unix_timestamp()
         )
         .as_str(),
     ); //

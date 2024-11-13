@@ -1,5 +1,4 @@
 pub mod download;
-pub mod fileserver;
 pub mod net_worker;
 
 use crate::models::event::ModelEvent;

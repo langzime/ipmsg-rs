@@ -2,6 +2,7 @@ use crate::models::event::{ModelEvent, UiEvent};
 use crate::models::model::Packet;
 use crate::{IpmsgUI, ListViewPageAdapter, Msg, User};
 use anyhow::{anyhow, Result};
+use log::debug;
 use slint::ComponentHandle;
 use slint::{Model, VecModel, Weak};
 use std::time::Duration;
@@ -40,6 +41,7 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                 if let Some(msg) = res {
                     match msg {
                         UiEvent::Quit => {
+                            debug!("ui_worker_loop quit!");
                             break;
                         }
                         UiEvent::UserListRemoveOne(user_ip) => {

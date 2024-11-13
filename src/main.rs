@@ -71,8 +71,9 @@ fn main() -> Result<()> {
             .unwrap();
     });
     let udp_worker = UdpWorker::new(ui_worker.channel.clone());
+    udp_worker.send_ipmsg_br_entry()?;
     ui.run()?;
-    ui_worker.join();
-    udp_worker.join();
+    ui_worker.join()?;
+    udp_worker.join()?;
     Ok(())
 }
