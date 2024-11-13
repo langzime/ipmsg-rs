@@ -10,11 +10,16 @@ mod util;
 
 const APP_ID: &'static str = "com.github.ipmsg-rs";
 slint::include_modules!();
+use crate::constants::protocol::{HOST_NAME, IPMSG_DEFAULT_PORT, LOCAL_IP};
 use crate::core::net_worker::UdpWorker;
 use crate::core::GLOBLE_SENDER;
 use crate::front::ui_worker::UiWorker;
 use crate::models::event::ModelEvent::SendTextMsg;
-use crate::store::logic::{db_init, list_latest_messages};
+use crate::models::event::{UdpEvent, UiEvent};
+use crate::models::message::create_sendmsg;
+use crate::store::logic::{db_init, insert_message, list_latest_messages};
+use crate::store::models::NewMessage;
+use crate::util::utf8_to_gb18030;
 use anyhow::Result;
 use diesel::prelude::*;
 use slint::{Model, VecModel};
@@ -62,15 +67,32 @@ fn main() -> Result<()> {
     });
 
     let ui_worker = UiWorker::new(&ui);
-    ui.global::<Logic>().on_send_msg(|ip, msg_type, text| {
-        GLOBLE_SENDER
-            .send(SendTextMsg {
-                to_ip: ip.to_string(),
-                context: text.to_string(),
-            })
-            .unwrap();
-    });
     let udp_worker = UdpWorker::new(ui_worker.channel.clone());
+    let udp_worker_sender = udp_worker.channel.clone();
+    let ui_worker_sender = ui_worker.channel.clone();
+    ui.global::<Logic>().on_send_msg(move |ip, msg_type, text| {
+        let mut messages = Vec::new();
+        let (packet, _) = create_sendmsg(text.to_string().clone(), None, ip.to_string());
+        let text_message = NewMessage {
+            ver: "1".to_string(),
+            message_id: packet.packet_no.clone(),
+            msg_type: 1,
+            sender_id: packet.sender_host.clone(),
+            sender_name: packet.sender_name.clone(),
+            receiver_id: LOCAL_IP.clone(),
+            receiver_name: HOST_NAME.clone(),
+            group_id: "".to_string(),
+            is_self: false,
+            content: text.to_string().clone(),
+            is_read: false,
+        };
+        messages.push(text_message.clone());
+        udp_worker_sender
+            .send(UdpEvent::Bytes((utf8_to_gb18030(packet.clone().to_string().as_ref()), ip.to_string())))
+            .expect("send failed!");
+        insert_message(text_message).expect("insert insert_message fail!");
+        ui_worker_sender.send(UiEvent::AppendingMessages(messages)).expect("send message fail!");
+    });
     udp_worker.send_ipmsg_br_entry()?;
     ui.run()?;
     ui_worker.join()?;
