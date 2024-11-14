@@ -10,11 +10,9 @@ mod util;
 
 const APP_ID: &'static str = "com.github.ipmsg-rs";
 slint::include_modules!();
-use crate::constants::protocol::{HOST_NAME, IPMSG_DEFAULT_PORT, LOCAL_IP};
+use crate::constants::protocol::{HOST_NAME, LOCAL_IP};
 use crate::core::net_worker::UdpWorker;
-use crate::core::GLOBLE_SENDER;
 use crate::front::ui_worker::UiWorker;
-use crate::models::event::ModelEvent::SendTextMsg;
 use crate::models::event::{UdpEvent, UiEvent};
 use crate::models::message::create_sendmsg;
 use crate::store::logic::{db_init, insert_message, list_latest_messages};
