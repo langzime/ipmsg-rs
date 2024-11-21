@@ -39,6 +39,7 @@ dirs = "5.0.1"
 config = "0.14.0"
 diesel_migrations = "2.2.0"
 serde_yaml = "0.9"
+bon = "3.0"
 
 
 [build-dependencies]

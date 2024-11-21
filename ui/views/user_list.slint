@@ -3,7 +3,7 @@ import { ListViewPageAdapter, User } from "../global.slint";
 
 
 export global UserListAdapter {
-    callback change_selected_user(string);
+    callback change_selected_user(string, string);
 }
 
 export component UserList inherits Rectangle {
@@ -54,7 +54,7 @@ export component UserList inherits Rectangle {
                     width: parent.width;
                     height: parent.height;
                     clicked => {
-                        UserListAdapter.change_selected_user(data.userId);
+                        UserListAdapter.change_selected_user(data.userId, data.name);
                     }
 
                 }

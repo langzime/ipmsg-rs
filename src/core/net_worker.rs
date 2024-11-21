@@ -141,7 +141,7 @@ pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<
     let cmd = protocol::get_mode(packet.command_no);
 
     if opt & protocol::IPMSG_SENDCHECKOPT != 0 {
-        let recvmsg = Packet::new(protocol::IPMSG_RECVMSG, Some(packet.packet_no.to_string()));
+        let recvmsg = Packet::new(protocol::IPMSG_SENDMSG_RECV_ACK, Some(packet.packet_no.to_string()));
         udp_event_send.send(UdpEvent::Bytes((recvmsg.to_string().into_bytes(), packet.ip.clone())))?;
     }
     if cmd == protocol::IPMSG_BR_EXIT {
@@ -151,7 +151,7 @@ pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<
         //收到上线通知消息
         ///扩展段 用户名|用户组
         let ext_vec = extstr.splitn(2, |c| c == ':').collect::<Vec<&str>>();
-        let ansentry_packet = Packet::new(protocol::IPMSG_ANSENTRY, None);
+        let ans_entry_packet = Packet::new(protocol::IPMSG_ANSENTRY, None);
         let group_name = if ext_vec.len() > 2 { ext_vec[1].to_owned() } else { "".to_owned() };
         let user_name = if ext_vec.len() > 1 && !ext_vec[0].is_empty() {
             ext_vec[0].to_owned()
@@ -159,7 +159,7 @@ pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<
             packet.sender_name.clone()
         };
         let user = User::new(user_name, packet.sender_host.to_owned(), packet.ip.to_owned(), group_name);
-        udp_event_send.send(UdpEvent::Bytes((ansentry_packet.to_string().into_bytes(), packet.ip.clone())))?;
+        udp_event_send.send(UdpEvent::Bytes((ans_entry_packet.to_string().into_bytes(), packet.ip.clone())))?;
         ui_event_sender.send(UiEvent::UserListAddOne(user))?;
     } else if cmd == protocol::IPMSG_ANSENTRY {
         //通报新上线

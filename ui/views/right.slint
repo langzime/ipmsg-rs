@@ -2,6 +2,46 @@ import { TextEdit, ListView, Button } from "std-widgets.slint";
 import { ListViewPageAdapter, User, Logic } from "../global.slint";
 import { NoMessage } from "./no_message.slint";
 
+export component LeftMessage inherits Rectangle {
+    in-out property<string> m_text;
+    width: 100%;
+    Image {
+        x: 10px; y: 10px;
+        width: 40px;
+        height: 40px;
+        source: @image-url("../../resources/head.png");
+    }
+    Text {
+        x: 60px; y:10px;
+        font-size: 14px;
+        width: parent.width - 60px;
+        text: m_text;
+        wrap: TextWrap.word-wrap;
+        overflow: TextOverflow.clip;
+        color: yellow;
+    }
+}
+
+export component RightMessage inherits Rectangle {
+    in-out property<string> m_text;
+    width: 100%;
+    Image {
+        x: 530px; y: 10px;
+        width: 40px;
+        height: 40px;
+        source: @image-url("../../resources/head.png");
+    }
+    Text {
+        x: 60px; y:10px;
+        font-size: 14px;
+        width: parent.width - 60px;
+        text: m_text;
+        wrap: TextWrap.word-wrap;
+        overflow: TextOverflow.clip;
+        color: yellow;
+    }
+}
+
 export component ChatWindow inherits Rectangle {
     min-width: 590px;
     height: 450px;
@@ -33,25 +73,17 @@ export component ChatWindow inherits Rectangle {
                 height: dyn_height(a.preferred-height + 10px);
                 preferred-height: 50px;
                 width: 580px;
-                Image {
-                    x: 10px; y: 10px;
-                    width: 40px;
-                    height: 40px;
-                    source: @image-url("../../resources/head.png");
-                }
-                a := Text {
-                    x: 60px; y:10px;
-                    font-size: 14px;
-                    width: parent.width - 60px;
-                    text: data.text;
-                    wrap: TextWrap.word-wrap;
-                    overflow: TextOverflow.clip;
-                    color: yellow;
-                }
+//                VerticalLayout {
+                    a := LeftMessage {
+                        m_text: data.text;
+                    }
+                    b := RightMessage {
+                        m_text: data.text;
+                    }
+//                }
             }
         }
     }
-
 }
 
 export component SendBox inherits Rectangle {
@@ -84,7 +116,7 @@ export component Right inherits Rectangle {
                 enabled: pre_send_text != "";
                 clicked => {
                     if (ListViewPageAdapter.user_id != "") {
-                        Logic.send_msg(ListViewPageAdapter.user_id, 1, pre_send_text);
+                        Logic.send_msg(ListViewPageAdapter.user_id, ListViewPageAdapter.user_name, 1, pre_send_text);
                         pre_send_text = "";
                     }
                 }

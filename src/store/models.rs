@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use time::{OffsetDateTime, PrimitiveDateTime};
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Debug)]
 #[diesel(table_name = crate::store::schema::messages)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Messages {

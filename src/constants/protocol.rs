@@ -17,7 +17,6 @@ pub const IPMSG_ANSENTRY: u32 = 0x00000003;
 ///更改为离开状态
 pub const IPMSG_BR_ABSENCE: u32 = 0x00000004;
 
-
 ///搜寻有效的主机用户
 pub const IPMSG_BR_ISGETLIST: u32 = 0x00000010;
 ///主机列表发送通知
@@ -29,11 +28,10 @@ pub const IPMSG_ANSLIST: u32 = 0x00000013;
 
 pub const IPMSG_BR_ISGETLIST2: u32 = 0x00000018;
 
-
 ///消息发送
 pub const IPMSG_SENDMSG: u32 = 0x00000020;
 ///消息收到确认
-pub const IPMSG_RECVMSG: u32 = 0x00000021;
+pub const IPMSG_SENDMSG_RECV_ACK: u32 = 0x00000021;
 ///消息打开通知
 pub const IPMSG_READMSG: u32 = 0x00000030;
 ///消息丢弃通知
@@ -66,17 +64,17 @@ pub const IPMSG_ANSPUBKEY: u32 = 0x00000073;
 /* file types for fileattach command */
 pub const IPMSG_FILE_REGULAR: u32 = 0x00000001;
 pub const IPMSG_FILE_DIR: u32 = 0x00000002;
-pub const IPMSG_FILE_RETPARENT: u32 = 0x00000003;// return parent directory
+pub const IPMSG_FILE_RETPARENT: u32 = 0x00000003; // return parent directory
 pub const IPMSG_FILE_SYMLINK: u32 = 0x00000004;
-pub const IPMSG_FILE_CDEV: u32 = 0x00000005;// for UNIX
-pub const IPMSG_FILE_BDEV: u32 = 0x00000006;// for UNIX
-pub const IPMSG_FILE_FIFO: u32 = 0x00000007;// for UNIX
-pub const IPMSG_FILE_RESFORK: u32 = 0x00000010;// for mac
+pub const IPMSG_FILE_CDEV: u32 = 0x00000005; // for UNIX
+pub const IPMSG_FILE_BDEV: u32 = 0x00000006; // for UNIX
+pub const IPMSG_FILE_FIFO: u32 = 0x00000007; // for UNIX
+pub const IPMSG_FILE_RESFORK: u32 = 0x00000010; // for mac
 
 /* file attribute options for fileattach command */
 pub const IPMSG_FILE_RONLYOPT: u32 = 0x00000100;
 pub const IPMSG_FILE_HIDDENOPT: u32 = 0x00001000;
-pub const IPMSG_FILE_EXHIDDENOPT: u32 = 0x00002000;// for MacOS X
+pub const IPMSG_FILE_EXHIDDENOPT: u32 = 0x00002000; // for MacOS X
 pub const IPMSG_FILE_ARCHIVEOPT: u32 = 0x00004000;
 pub const IPMSG_FILE_SYSTEMOPT: u32 = 0x00008000;
 
@@ -130,7 +128,7 @@ pub const IPMSG_NOLOGOPT: u32 = 0x00020000;
 pub const IPMSG_NOADDLISTOPT: u32 = 0x00080000;
 ///密封消息确认
 pub const IPMSG_READCHECKOPT: u32 = 0x00100000;
-pub const IPMSG_SECRETEXOPT: u32 = IPMSG_READCHECKOPT|IPMSG_SECRETOPT;
+pub const IPMSG_SECRETEXOPT: u32 = IPMSG_READCHECKOPT | IPMSG_SECRETOPT;
 
 pub const IPMSG_LIMITED_BROADCAST: &'static str = "255.255.255.255";
 
@@ -150,8 +148,8 @@ pub const IPMSG_PACKET_DELIMITER: char = ':';
 
 use ::hostname as host_name;
 
-use std::net::IpAddr;
 use once_cell::sync::Lazy;
+use std::net::IpAddr;
 
 ///得到本地ip
 pub fn get_local_ip() -> IpAddr {
@@ -163,16 +161,14 @@ pub fn get_host_name() -> String {
     host_name::get().unwrap().into_string().unwrap()
 }
 
-pub static HOST_NAME: Lazy<String> = Lazy::new(||{
+pub static HOST_NAME: Lazy<String> = Lazy::new(|| {
     return get_host_name();
 });
 
-pub static LOCAL_IP: Lazy<String> = Lazy::new(||{
+pub static LOCAL_IP: Lazy<String> = Lazy::new(|| {
     return get_local_ip().to_string();
 });
 
-pub static ADDR: Lazy<String> = Lazy::new(||{
+pub static ADDR: Lazy<String> = Lazy::new(|| {
     return format!("{}{}", "0.0.0.0:", IPMSG_DEFAULT_PORT);
 });
-
-

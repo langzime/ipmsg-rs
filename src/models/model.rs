@@ -1,4 +1,4 @@
-use crate::constants::protocol::{self, IPMSG_VERSION};
+use crate::constants::protocol::{self, IPMSG_VERSION, LOCAL_IP};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -51,7 +51,7 @@ impl Packet {
             ver: format!("{}", IPMSG_VERSION),
             packet_no: format!("{}", timestamp),
             sender_name: protocol::HOST_NAME.clone(),
-            sender_host: protocol::get_local_ip().to_string(),
+            sender_host: LOCAL_IP.clone(),
             command_no,
             additional_section,
             ip: "".to_owned(),

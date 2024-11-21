@@ -81,7 +81,7 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                         // UiEvent::CloseChatWindow(_) => {}
                         UiEvent::OpenOrReOpenChatWindow1{ name, ip, packet} => {
                             println!("OpenOrReOpenChatWindow1: {:?} {:?} {:?}", name, ip, packet);
-                            if let Some(Packet{additional_section: Some(additional_section), ..}) = packet {
+                            /*if let Some(Packet{additional_section: Some(additional_section), ..}) = packet {
                                 let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
                                     let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
                                     let the_model = msgs.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<User> fail!");
@@ -94,7 +94,7 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                                     };
                                     the_model.push(msg);
                                 });
-                            }
+                            }*/
                         }
                         UiEvent::DisplaySelfSendMsgInHis { .. } => {}
                         UiEvent::DisplayReceivedMsgInHis { .. } => {}
@@ -115,7 +115,8 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                                             image_url: Default::default(),
                                             name: m.sender_name.into(),
                                             text: m.content.into(),
-                                            userId: m.sender_id.into()
+                                            userId: m.sender_id.into(),
+                                            is_self: m.is_self
                                         };
                                         the_model.push(msg);
                                     }
