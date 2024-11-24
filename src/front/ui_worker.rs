@@ -107,7 +107,6 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                                 let user_id = ipmsg_ui.global::<ListViewPageAdapter>().get_user_id();
                                 let selected_user = user_id.as_str();
                                 println!("AppendingMessages-> sender:{} selected_user:{}", msg_user_id, selected_user);
-                                // if selected_user == msg_user_id.clone() {
                                     let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
                                     let the_model = msgs.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<User> fail!");
                                     for m in messages {
@@ -120,7 +119,6 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                                         };
                                         the_model.push(msg);
                                     }
-                                // }
                             });
                         }
                         _ => {
