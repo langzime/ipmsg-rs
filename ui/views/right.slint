@@ -1,20 +1,22 @@
-import { TextEdit, ListView, Button } from "std-widgets.slint";
+import { TextEdit, ListView, Button} from "std-widgets.slint";
 import { ListViewPageAdapter, User, Logic } from "../global.slint";
 import { NoMessage } from "./no_message.slint";
 
 export component LeftMessage inherits Rectangle {
     in-out property<string> m_text;
-    width: 100%;
-    Image {
+    in-out property<length> text_lenght <=> t.preferred-height;
+    height: max(t.preferred-height + 10px, i.height + 10px + 10px);
+    background: lightgreen;
+    i := Image {
         x: 10px; y: 10px;
         width: 40px;
         height: 40px;
         source: @image-url("../../resources/head.png");
     }
-    Text {
+    t := Text {
         x: 60px; y:10px;
         font-size: 14px;
-        width: parent.width - 60px;
+        width: parent.width - i.width - 10px;
         text: m_text;
         wrap: TextWrap.word-wrap;
         overflow: TextOverflow.clip;
@@ -24,21 +26,24 @@ export component LeftMessage inherits Rectangle {
 
 export component RightMessage inherits Rectangle {
     in-out property<string> m_text;
-    width: 100%;
-    Image {
+    in-out property<length> text_lenght <=> t.preferred-height;
+    height: max(t.preferred-height + 10px, i.height + 10px + 10px);
+    background: green;
+    i := Image {
         x: 530px; y: 10px;
         width: 40px;
         height: 40px;
         source: @image-url("../../resources/head.png");
     }
-    Text {
-        x: 60px; y:10px;
+    t := Text {
+        x: 10px; y:10px;
         font-size: 14px;
-        width: parent.width - 60px;
+        width: parent.width - i.width - 30px;
         text: m_text;
         wrap: TextWrap.word-wrap;
         overflow: TextOverflow.clip;
         color: yellow;
+        horizontal-alignment: right;
     }
 }
 
@@ -64,23 +69,34 @@ export component ChatWindow inherits Rectangle {
                 lv.viewport-y = lv.viewport-y - lv.visible-height/4;
             }
         }
-        public pure function dyn_height(input_height: length) -> length {
-            if (input_height >= 60px) { return input_height; } else {60px}
+        public pure function dyn_height(a_input_height: length, b_input_height: length, is_self: bool) -> length {
+            if (!is_self) {
+                debug(is_self);
+                if (a_input_height >= 60px) {
+                    return a_input_height;
+                }
+            }
+            if (is_self) {
+                debug(is_self);
+                if (b_input_height >= 60px) {
+                    return b_input_height;
+                }
+            }
+            return 60px;
         }
         lv := ListView {
             for data[index] in ListViewPageAdapter.msgs : Rectangle {
                 background: darkgrey;
-                height: dyn_height(a.preferred-height + 10px);
-                preferred-height: 50px;
+                height: dyn_height(a.height, b.height, data.is_self);
                 width: 580px;
-//                VerticalLayout {
-                    a := LeftMessage {
-                        m_text: data.text;
-                    }
-                    b := RightMessage {
-                        m_text: data.text;
-                    }
-//                }
+                a := LeftMessage {
+                    visible: !data.is_self;
+                    m_text: data.text;
+                }
+                b := RightMessage {
+                    visible: data.is_self;
+                    m_text: data.text;
+                }
             }
         }
     }

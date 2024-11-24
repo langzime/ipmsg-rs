@@ -88,11 +88,11 @@ fn main() -> Result<()> {
         };
         println!("on_send_msg-{text_message:?}");
         messages.push(text_message.clone());
-        ui_worker_sender.send(UiEvent::AppendingMessages(messages)).expect("send message fail!");
         insert_message(text_message).expect("insert insert_message fail!");
         udp_worker_sender
             .send(UdpEvent::Bytes((utf8_to_gb18030(packet.clone().to_string().as_ref()), ip.to_string())))
             .expect("send failed!");
+        ui_worker_sender.send(UiEvent::AppendingMessages(messages)).expect("send message fail!");
     });
     udp_worker.send_ipmsg_br_entry()?;
     ui.run()?;
