@@ -18,11 +18,11 @@ use crate::models::event::{UdpEvent, UiEvent};
 use crate::models::message::create_sendmsg;
 use crate::store::logic::{db_init, insert_message, list_latest_messages};
 use crate::store::models::NewMessage;
+use crate::utils::logs;
 use crate::utils::util::utf8_to_gb18030;
 use anyhow::Result;
 use slint::{Model, VecModel};
 use tracing::debug;
-use crate::utils::logs;
 
 fn main() -> Result<()> {
     let _g = logs::init("./", false);
