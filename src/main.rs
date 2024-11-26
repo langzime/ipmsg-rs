@@ -6,25 +6,26 @@ mod events;
 mod front;
 mod models;
 mod store;
-mod util;
+mod utils;
 
 const APP_ID: &'static str = "com.github.ipmsg-rs";
 slint::include_modules!();
-use crate::constants::protocol::{HOST_NAME, LOCAL_IP};
+use crate::constants::protocol::msg_type::MSG_TYPE_TEXT;
+use crate::constants::protocol::{HOST_NAME, IPMSG_VERSION, LOCAL_IP};
 use crate::core::net_worker::UdpWorker;
 use crate::front::ui_worker::UiWorker;
 use crate::models::event::{UdpEvent, UiEvent};
 use crate::models::message::create_sendmsg;
 use crate::store::logic::{db_init, insert_message, list_latest_messages};
 use crate::store::models::NewMessage;
-use crate::util::utf8_to_gb18030;
+use crate::utils::util::utf8_to_gb18030;
 use anyhow::Result;
 use slint::{Model, VecModel};
+use tracing::debug;
+use crate::utils::logs;
 
 fn main() -> Result<()> {
-    let config_str = include_str!("../config/log4rs.yaml");
-    let config = serde_yaml::from_str(config_str)?;
-    log4rs::init_raw_config(config)?;
+    let _g = logs::init("./", false);
     db_init()?;
     let ui = IpmsgUI::new()?;
     let handle = ui.as_weak();
@@ -74,9 +75,9 @@ fn main() -> Result<()> {
         let mut messages = Vec::new();
         let (packet, _) = create_sendmsg(text.to_string().clone(), None, ip.to_string());
         let text_message = NewMessage {
-            ver: "1".to_string(),
+            ver: IPMSG_VERSION.to_string(),
             message_id: packet.packet_no.clone(),
-            msg_type: 0,
+            msg_type: MSG_TYPE_TEXT as i32,
             sender_id: LOCAL_IP.clone(),
             sender_name: HOST_NAME.clone(),
             receiver_id: ip.to_string(),
@@ -86,7 +87,7 @@ fn main() -> Result<()> {
             content: text.to_string().clone(),
             is_read: false,
         };
-        println!("on_send_msg-{text_message:?}");
+        debug!("on_send_msg-{text_message:?}");
         messages.push(text_message.clone());
         insert_message(text_message).expect("insert insert_message fail!");
         udp_worker_sender

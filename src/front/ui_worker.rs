@@ -2,13 +2,13 @@ use crate::models::event::{ModelEvent, UiEvent};
 use crate::models::model::Packet;
 use crate::{IpmsgUI, ListViewPageAdapter, Msg, User};
 use anyhow::{anyhow, Result};
-use log::debug;
 use slint::ComponentHandle;
 use slint::{Model, VecModel, Weak};
 use std::time::Duration;
 use time::OffsetDateTime;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::interval;
+use tracing::debug;
 
 pub struct UiWorker {
     pub channel: UnboundedSender<UiEvent>,
@@ -65,7 +65,7 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                                 let u_opt = the_model.iter().find(|u| u.userId == user.ip);
                                 let timestamp_now = OffsetDateTime::now_utc().unix_timestamp();
                                 if u_opt.is_none() {
-                                    println!("新上线用户：{}", user.ip);
+                                    debug!("新上线用户：{}", user.ip);
                                     let user = User {
                                         name: user.name.into(),
                                         on_line: true,
@@ -80,7 +80,7 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                         }
                         // UiEvent::CloseChatWindow(_) => {}
                         UiEvent::OpenOrReOpenChatWindow1{ name, ip, packet} => {
-                            println!("OpenOrReOpenChatWindow1: {:?} {:?} {:?}", name, ip, packet);
+                            debug!("OpenOrReOpenChatWindow1: {:?} {:?} {:?}", name, ip, packet);
                             /*if let Some(Packet{additional_section: Some(additional_section), ..}) = packet {
                                 let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
                                     let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
@@ -102,11 +102,12 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                         UiEvent::AppendingMessages(messages) => {
                             let msg = messages.get(0).unwrap();
                             let msg_user_id = msg.sender_id.clone();
-                            println!("AppendingMessages->{}, {:?}", msg_user_id, messages.clone());
+                            debug!("AppendingMessages->{}, {:?}", msg_user_id, messages.clone());
                             let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
                                 let user_id = ipmsg_ui.global::<ListViewPageAdapter>().get_user_id();
                                 let selected_user = user_id.as_str();
-                                println!("AppendingMessages-> sender:{} selected_user:{}", msg_user_id, selected_user);
+                                debug!("AppendingMessages-> sender:{} selected_user:{}", msg_user_id, selected_user);
+                                if !selected_user.is_empty() {
                                     let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
                                     let the_model = msgs.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<User> fail!");
                                     for m in messages {
@@ -118,17 +119,21 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                                             is_self: m.is_self
                                         };
                                         the_model.push(msg);
+                                        let has_new = ipmsg_ui.global::<ListViewPageAdapter>().get_has_new_msg();
+                                        debug!("rust-{has_new}");
+                                        ipmsg_ui.global::<ListViewPageAdapter>().set_has_new_msg(true);
                                     }
+                                }
                             });
                         }
                         _ => {
-                            println!("unknown event: {:?}", msg);
+                            debug!("unknown event: {:?}", msg);
                         }
                     }
                 }
             }
             _ = interval.tick() => {
-                println!("tick");
+                debug!("tick");
             }
         }
     }

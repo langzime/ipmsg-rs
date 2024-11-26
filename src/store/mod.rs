@@ -4,8 +4,8 @@ pub mod schema;
 
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use log::debug;
 use once_cell::sync::Lazy;
+use tracing::debug;
 
 pub static GLOBAL_POOL: Lazy<Pool<ConnectionManager<SqliteConnection>>> = Lazy::new(|| {
     return get_connection_pool(&AppConfig::get_database_url());

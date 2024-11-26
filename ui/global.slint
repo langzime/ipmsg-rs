@@ -9,6 +9,7 @@ export global ListViewPageAdapter  {
     in property <[Msg]> msgs: [];
     in property <string> user_id: "";
     in property <string> user_name: "";
+    in-out property <bool> has_new_msg: false;
 }
 
 export global ROOT_GLOBAL {

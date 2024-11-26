@@ -1,7 +1,7 @@
 use crate::constants::protocol::{IPMSG_FILEATTACHOPT, IPMSG_SENDMSG};
 use crate::models::model::{self, Packet};
-use log::info;
 use time::OffsetDateTime;
+use tracing::info;
 
 pub fn create_sendmsg(context: String, file_opt: Option<model::FileInfo>, tar_ip: String) -> (Packet, Option<model::ShareInfo>) {
     let commond = if file_opt.is_some() {

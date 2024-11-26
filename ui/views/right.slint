@@ -52,38 +52,52 @@ export component ChatWindow inherits Rectangle {
     height: 450px;
     in-out property viewport-y <=> lv.viewport-y;
     in-out property viewport-height <=> lv.viewport-height;
+    in-out property has_new_msg <=> ListViewPageAdapter.has_new_msg;
+    in-out property<bool> is-chats-auto-scroll-down: false;
+    changed has_new_msg => {
+        debug("has_new_msg changed:");
+        debug(has_new_msg);
+        if (has_new_msg&&v.is-chats-on-bottom()) {
+            debug("xxxxxxx");
+            v.scroll-to-bottom();
+        }
+        has_new_msg = false;
+    }
     v := Flickable {
         viewport-width: parent.width;
         width: parent.width;
         height: parent.height;
 
-        public function scroll-down() {
-            if (lv.viewport-height <= lv.visible-height ||
-                    lv.viewport-y <= -lv.viewport-height + lv.visible-height) {
+        public function is-chats-on-bottom() -> bool {
+            lv.viewport-y <= -lv.viewport-height + (lv.visible-height * 1.2);
+        }
+
+        public function scroll-to-bottom() {
+            if (lv.viewport-height <= lv.visible-height) {
                 return;
             }
-
-            if (lv.viewport-y - lv.visible-height/4 <= -lv.viewport-height) {
-                lv.viewport-y = -lv.viewport-height + lv.visible-height;
-            } else {
-                lv.viewport-y = lv.viewport-y - lv.visible-height/4;
-            }
+            lv.viewport-y = -lv.viewport-height + lv.visible-height;
         }
+
+        public function scroll-to-top() {
+            lv.viewport-y = 0;
+        }
+
         public pure function dyn_height(a_input_height: length, b_input_height: length, is_self: bool) -> length {
             if (!is_self) {
-                debug(is_self);
                 if (a_input_height >= 60px) {
                     return a_input_height;
                 }
             }
             if (is_self) {
-                debug(is_self);
                 if (b_input_height >= 60px) {
                     return b_input_height;
                 }
             }
+            debug("dyn_height");
             return 60px;
         }
+
         lv := ListView {
             for data[index] in ListViewPageAdapter.msgs : Rectangle {
                 background: darkgrey;

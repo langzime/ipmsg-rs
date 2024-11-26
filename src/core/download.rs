@@ -7,7 +7,6 @@ use crate::models::model::{Packet, ReceivedSimpleFileInfo, ShareInfo};
 use anyhow::{anyhow, Result};
 use encoding::all::GB18030;
 use encoding::{DecoderTrap, Encoding};
-use log::{debug, info};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -16,6 +15,7 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpStream, ToSocketAddrs};
+use tracing::{debug, info};
 
 pub static DOWNLOAD_TASK_LIST: Lazy<Arc<Mutex<HashMap<u32, PoolFile>>>> = Lazy::new(|| return Default::default());
 

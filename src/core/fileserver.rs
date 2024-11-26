@@ -5,7 +5,6 @@ use crate::{constants::protocol, util};
 use combine::parser::Parser;
 use encoding::all::GB18030;
 use encoding::{DecoderTrap, Encoding};
-use log::{debug, info};
 use std::fs::{self, File, Metadata};
 use std::io::{BufWriter, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -13,6 +12,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use time::OffsetDateTime;
+use tracing::{debug, info};
 
 #[derive(Clone, Debug)]
 pub struct FileServer {

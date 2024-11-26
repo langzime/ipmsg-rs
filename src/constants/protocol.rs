@@ -172,3 +172,9 @@ pub static LOCAL_IP: Lazy<String> = Lazy::new(|| {
 pub static ADDR: Lazy<String> = Lazy::new(|| {
     return format!("{}{}", "0.0.0.0:", IPMSG_DEFAULT_PORT);
 });
+
+pub mod msg_type {
+    pub const MSG_TYPE_TEXT: u8 = 0;
+    pub const MSG_TYPE_FILE: u8 = 1;
+    pub const MSG_TYPE_DIR: u8 = 2;
+}

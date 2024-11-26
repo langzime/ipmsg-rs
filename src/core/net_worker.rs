@@ -1,4 +1,5 @@
 use crate::constants::protocol;
+use crate::constants::protocol::msg_type::MSG_TYPE_FILE;
 use crate::constants::protocol::{HOST_NAME, IPMSG_DEFAULT_PORT, IPMSG_LIMITED_BROADCAST, IPMSG_PACKET_DELIMITER, LOCAL_IP, REPARENT_PATH};
 use crate::core::{GLOBLE_RECEIVER, GLOBLE_SENDER};
 use crate::models::event::{ModelEvent, TcpEvent, UdpEvent, UiEvent};
@@ -6,14 +7,13 @@ use crate::models::message::create_sendmsg;
 use crate::models::model::{Packet, ReceivedPacketInner, ReceivedSimpleFileInfo, ShareInfo, User};
 use crate::store::logic::insert_message;
 use crate::store::models::NewMessage;
-use crate::util::packet_parser;
-use crate::{constants, util, IpmsgUI};
+use crate::utils::util::{packet_parser, utf8_to_gb18030};
+use crate::{constants, IpmsgUI};
 use anyhow::Result;
 use combine::Parser;
 use crossbeam_channel::SendError;
 use encoding::all::GB18030;
 use encoding::{DecoderTrap, Encoding};
-use log::{debug, error, info};
 use once_cell::sync::Lazy;
 use slint::Weak;
 use std::path::PathBuf;
@@ -25,6 +25,7 @@ use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::{fs, select};
+use tracing::{debug, error, info};
 
 pub struct UdpWorker {
     pub channel: UnboundedSender<UdpEvent>,
@@ -243,7 +244,7 @@ pub fn model_packet_dispatcher(packet: Packet, ui_event_sender: UnboundedSender<
                 let file_message = NewMessage {
                     ver: ver.clone(),
                     message_id: packet_no.clone(),
-                    msg_type: 1,
+                    msg_type: MSG_TYPE_FILE as i32,
                     sender_id: ip.clone(),
                     sender_name: name.clone(),
                     receiver_id: LOCAL_IP.clone(),
@@ -414,7 +415,7 @@ async fn process_dir(stream_echo: TcpStream, ext_str: String) -> Result<()> {
 }
 
 pub async fn send_dir(root_path: &PathBuf, mut buffer: &mut BufWriter<TcpStream>) -> Result<()> {
-    buffer.write(util::utf8_to_gb18030(&make_header(&root_path, false).await?).as_slice()).await?;
+    buffer.write(utf8_to_gb18030(&make_header(&root_path, false).await?).as_slice()).await?;
     debug!("{:?}", make_header(&root_path, false).await?);
     if root_path.is_dir() {
         let mut entries = fs::read_dir(".").await?;
@@ -422,7 +423,7 @@ pub async fn send_dir(root_path: &PathBuf, mut buffer: &mut BufWriter<TcpStream>
             let sub = entry.path();
             if sub.is_file() {
                 let header = make_header(&sub, false).await?;
-                buffer.write(util::utf8_to_gb18030(&header).as_slice()).await?;
+                buffer.write(utf8_to_gb18030(&header).as_slice()).await?;
                 info!("{:?}", header);
                 let mut buf = [0; 1024];
                 let mut f = File::open(&sub).await.unwrap();
@@ -485,7 +486,7 @@ pub async fn make_header(path: &PathBuf, ret_parent: bool) -> Result<String> {
         )
         .as_str(),
     ); //
-    let mut length = util::utf8_to_gb18030(&header).len();
+    let mut length = utf8_to_gb18030(&header).len();
     length = length + format!("{:0>4x}", length).len();
     header.insert_str(0, format!("{:0>4x}", length).as_str());
     Ok(header)
