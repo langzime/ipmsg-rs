@@ -8,7 +8,7 @@ use std::time::Duration;
 use time::OffsetDateTime;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::interval;
-use tracing::debug;
+use tracing::{debug, info};
 
 pub struct UiWorker {
     pub channel: UnboundedSender<UiEvent>,
@@ -81,20 +81,6 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                         // UiEvent::CloseChatWindow(_) => {}
                         UiEvent::OpenOrReOpenChatWindow1{ name, ip, packet} => {
                             debug!("OpenOrReOpenChatWindow1: {:?} {:?} {:?}", name, ip, packet);
-                            /*if let Some(Packet{additional_section: Some(additional_section), ..}) = packet {
-                                let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
-                                    let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
-                                    let the_model = msgs.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<User> fail!");
-                                    let additions = additional_section.split("\0").collect::<Vec<_>>();
-                                    let msg = Msg {
-                                        image_url: Default::default(),
-                                        name: Default::default(),
-                                        text: additions[0].into(),
-                                        userId: Default::default()
-                                    };
-                                    the_model.push(msg);
-                                });
-                            }*/
                         }
                         UiEvent::DisplaySelfSendMsgInHis { .. } => {}
                         UiEvent::DisplayReceivedMsgInHis { .. } => {}
@@ -102,11 +88,11 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                         UiEvent::AppendingMessages(messages) => {
                             let msg = messages.get(0).unwrap();
                             let msg_user_id = msg.sender_id.clone();
-                            debug!("AppendingMessages->{}, {:?}", msg_user_id, messages.clone());
+                            info!("AppendingMessages->{}, {:?}", msg_user_id, messages.clone());
                             let _ = handle.clone().upgrade_in_event_loop(move |ipmsg_ui| {
                                 let user_id = ipmsg_ui.global::<ListViewPageAdapter>().get_user_id();
                                 let selected_user = user_id.as_str();
-                                debug!("AppendingMessages-> sender:{} selected_user:{}", msg_user_id, selected_user);
+                                info!("AppendingMessages-> sender:{} selected_user:{}", msg_user_id, selected_user);
                                 if !selected_user.is_empty() {
                                     let msgs = ipmsg_ui.global::<ListViewPageAdapter>().get_msgs();
                                     let the_model = msgs.as_any().downcast_ref::<VecModel<Msg>>().expect("downcast_ref VecModel<User> fail!");
@@ -119,15 +105,15 @@ async fn ui_worker_loop(mut r: UnboundedReceiver<UiEvent>, handle: Weak<IpmsgUI>
                                             is_self: m.is_self
                                         };
                                         the_model.push(msg);
-                                        let has_new = ipmsg_ui.global::<ListViewPageAdapter>().get_has_new_msg();
-                                        debug!("rust-{has_new}");
                                         ipmsg_ui.global::<ListViewPageAdapter>().set_has_new_msg(true);
+                                        ipmsg_ui.invoke_scroll_to_bottom();
+                                        ipmsg_ui.global::<ListViewPageAdapter>().set_has_new_msg(false);
                                     }
                                 }
                             });
                         }
                         _ => {
-                            debug!("unknown event: {:?}", msg);
+                            info!("unknown event: {:?}", msg);
                         }
                     }
                 }

@@ -48,35 +48,36 @@ export component RightMessage inherits Rectangle {
 }
 
 export component ChatWindow inherits Rectangle {
-    min-width: 590px;
+    // min-width: 590px;
+    width: 580px;
     height: 450px;
     in-out property viewport-y <=> lv.viewport-y;
     in-out property viewport-height <=> lv.viewport-height;
-    in-out property has_new_msg <=> ListViewPageAdapter.has_new_msg;
     in-out property<bool> is-chats-auto-scroll-down: false;
-    changed has_new_msg => {
-        debug("has_new_msg changed:");
-        debug(has_new_msg);
-        if (has_new_msg&&v.is-chats-on-bottom()) {
-            debug("xxxxxxx");
-            v.scroll-to-bottom();
-        }
-        has_new_msg = false;
+
+    public function scroll-to-bottom() {
+        v.scroll-to-bottom();
     }
+
     v := Flickable {
+        in-out property has_new_msg <=> ListViewPageAdapter.has_new_msg;
         viewport-width: parent.width;
         width: parent.width;
-        height: parent.height;
+        height: 100%;
 
         public function is-chats-on-bottom() -> bool {
             lv.viewport-y <= -lv.viewport-height + (lv.visible-height * 1.2);
         }
 
         public function scroll-to-bottom() {
+            debug(lv.viewport-height);
+            debug(lv.visible-height);
+            debug(lv.viewport-height <= lv.visible-height);
             if (lv.viewport-height <= lv.visible-height) {
                 return;
             }
-            lv.viewport-y = -lv.viewport-height + lv.visible-height;
+            lv.viewport-y = lv.visible-height - lv.viewport-height - 60px;
+            debug(lv.viewport-y);
         }
 
         public function scroll-to-top() {
@@ -94,11 +95,11 @@ export component ChatWindow inherits Rectangle {
                     return b_input_height;
                 }
             }
-            debug("dyn_height");
             return 60px;
         }
 
         lv := ListView {
+            height: 100%;
             for data[index] in ListViewPageAdapter.msgs : Rectangle {
                 background: darkgrey;
                 height: dyn_height(a.height, b.height, data.is_self);
@@ -118,6 +119,7 @@ export component ChatWindow inherits Rectangle {
 
 export component SendBox inherits Rectangle {
     in-out property <string> pre_send_text <=> te.text;
+    min-width: 590px;
     te := TextEdit {
         font-size: 14px;
         width: parent.width;
@@ -129,9 +131,12 @@ export component SendBox inherits Rectangle {
 
 export component Right inherits Rectangle {
     in-out property <string> pre_send_text <=> sb.pre_send_text;
+    public function scroll-to-bottom() {
+        cw.scroll-to-bottom();
+    }
     VerticalLayout {
         visible: ListViewPageAdapter.user_id != "";
-        ChatWindow {
+        cw := ChatWindow {
         }
         sb := SendBox {
             background: lightgrey;

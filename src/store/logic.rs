@@ -6,14 +6,18 @@ use anyhow::{anyhow, Result};
 use diesel::prelude::*;
 use diesel::sqlite::Sqlite;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use tracing::instrument;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+#[instrument]
 pub fn db_init() -> Result<()> {
     let mut conn = GLOBAL_POOL.clone().get().expect("Could not get connection from pool");
     run_migrations(&mut conn)?;
     Ok(())
 }
 
+#[instrument(skip(connection))]
 fn run_migrations(connection: &mut impl MigrationHarness<Sqlite>) -> Result<()> {
     connection
         .run_pending_migrations(MIGRATIONS)
@@ -21,6 +25,7 @@ fn run_migrations(connection: &mut impl MigrationHarness<Sqlite>) -> Result<()> 
     Ok(())
 }
 
+#[instrument]
 pub fn list_latest_messages(user_id: String, num: i64) -> Result<Vec<Messages>> {
     let mut conn = GLOBAL_POOL.clone().get().expect("Could not get connection from pool");
     let mut vec = messages
@@ -33,6 +38,7 @@ pub fn list_latest_messages(user_id: String, num: i64) -> Result<Vec<Messages>> 
     Ok(vec)
 }
 
+#[instrument]
 pub fn insert_message(msg: NewMessage) -> Result<i32> {
     let mut conn = GLOBAL_POOL.clone().get().expect("Could not get connection from pool");
     let msg_id = diesel::insert_into(messages).values(msg).returning(id).get_result(&mut conn)?;

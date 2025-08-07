@@ -2,7 +2,6 @@
 
 mod constants;
 mod core;
-mod events;
 mod front;
 mod models;
 mod store;
@@ -19,13 +18,13 @@ use crate::models::message::create_sendmsg;
 use crate::store::logic::{db_init, insert_message, list_latest_messages};
 use crate::store::models::NewMessage;
 use crate::utils::logs;
-use crate::utils::util::utf8_to_gb18030;
+use crate::utils::util::{get_config_dir, utf8_to_gb18030};
 use anyhow::Result;
 use slint::{Model, VecModel};
 use tracing::debug;
 
 fn main() -> Result<()> {
-    let _g = logs::init("./", false);
+    let _g = logs::init(get_config_dir().to_str().unwrap());
     db_init()?;
     let ui = IpmsgUI::new()?;
     let handle = ui.as_weak();

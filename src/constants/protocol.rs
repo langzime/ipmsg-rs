@@ -152,7 +152,7 @@ use once_cell::sync::Lazy;
 use std::net::IpAddr;
 
 ///得到本地ip
-pub fn get_local_ip() -> IpAddr {
+fn get_local_ip() -> IpAddr {
     local_ip_address::local_ip().expect("获取本地ip失败")
 }
 
@@ -177,4 +177,19 @@ pub mod msg_type {
     pub const MSG_TYPE_TEXT: u8 = 0;
     pub const MSG_TYPE_FILE: u8 = 1;
     pub const MSG_TYPE_DIR: u8 = 2;
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+    use anyhow::Result;
+    use local_ip_address::list_afinet_netifas;
+    use std::net::SocketAddr;
+
+    #[test]
+    fn test_fn() -> Result<()> {
+        let ip = local_ip_address::local_ip()?;
+        println!("{:?}", ip);
+        Ok(())
+    }
 }

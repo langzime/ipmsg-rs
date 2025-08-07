@@ -2,6 +2,7 @@ pub mod logic;
 pub mod models;
 pub mod schema;
 
+use crate::utils::util::get_config_dir;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use once_cell::sync::Lazy;
@@ -15,16 +16,9 @@ pub struct AppConfig;
 
 impl AppConfig {
     pub fn get_database_url() -> String {
-        if let Some(mut tmp) = dirs::config_dir() {
-            tmp = tmp.join("ipmsg-rs");
-            if tmp.exists() == false {
-                std::fs::create_dir_all(&tmp).expect("create dir failed");
-            }
-            tmp = tmp.join("data.dat");
-            tmp.into_os_string().into_string().unwrap()
-        } else {
-            panic!("获取操作系统配置目录失败！");
-        }
+        let mut config_dir = get_config_dir();
+        config_dir = config_dir.join("data.dat");
+        config_dir.into_os_string().into_string().unwrap()
     }
 }
 
@@ -34,12 +28,12 @@ pub fn get_connection_pool(database_url: &str) -> Pool<ConnectionManager<SqliteC
     Pool::builder().test_on_check_out(true).build(manager).expect("Could not build connection pool")
 }
 
-#[test]
-pub mod test {
+#[cfg(test)]
+mod test {
     use super::*;
 
     #[test]
-    pub fn test() {
+    fn test() {
         let pool = get_connection_pool("");
         let conn = pool.clone().get().expect("Could not get connection from pool");
     }

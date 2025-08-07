@@ -6,13 +6,16 @@ export { ListViewPageAdapter, User, Logic }
 export { UserList, UserListAdapter }
 
 export component IpmsgUI inherits Window {
-    width: ROOT_GLOBAL.window-width;
-    height: ROOT_GLOBAL.window-height;
+    min-width: ROOT_GLOBAL.window-width;
+    min-height: ROOT_GLOBAL.window-height;
     title: @tr("ipmsg");
-
+    // no-frame: true;
+    public function scroll-to-bottom() {
+        r.scroll-to-bottom();
+    }
     HorizontalLayout {
         ToolBar {}
         UserList {}
-        Right {}
+        r := Right {}
     }
 }

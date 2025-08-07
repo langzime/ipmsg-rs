@@ -11,11 +11,10 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Layer;
 
-pub fn init(logs_dir: &str, performance_logging: bool) -> WorkerGuard {
+pub fn init(logs_dir: &str) -> WorkerGuard {
     let log_prefix = "ipmsg-rs";
     let log_suffix = "log";
     let max_log_files = 14;
-    // remove_old_logs(&logs_dir).ok();
     let file_appender = RollingFileAppender::builder()
         .rotation(Rotation::DAILY)
         .max_log_files(max_log_files)
@@ -24,11 +23,6 @@ pub fn init(logs_dir: &str, performance_logging: bool) -> WorkerGuard {
         .build(&logs_dir)
         .expect("initializing rolling file appender failed");
     let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
-    // As the file-writer only checks `max_log_files` on file rotation, it bascially never happens.
-    // Run it now.
-    // prune_old_logs(&logs_dir, Some(log_prefix), Some(log_suffix), max_log_files).ok();
-
-    // app_handle.manage(guard); // keep the guard alive for the lifetime of the app
 
     let format_for_humans = tracing_subscriber::fmt::format()
         .with_file(true)
@@ -63,23 +57,16 @@ pub fn init(logs_dir: &str, performance_logging: bool) -> WorkerGuard {
                 .with_writer(file_writer)
                 .with_filter(log_level_filter),
         );
-    if performance_logging {
-        set_global_default(
-            subscriber
-                .with(tracing_forest::ForestLayer::from(tracing_forest::printer::PrettyPrinter::new().writer(std::io::stdout)).with_filter(log_level_filter)),
-        )
-    } else {
-        set_global_default(
-            subscriber.with(
-                // subscriber that writes spans to stdout
-                tracing_subscriber::fmt::layer()
-                    .event_format(format_for_humans)
-                    .with_ansi(use_colors_in_logs)
-                    .with_span_events(FmtSpan::CLOSE)
-                    .with_filter(log_level_filter),
-            ),
-        )
-    }
+    set_global_default(
+        subscriber.with(
+            // subscriber that writes spans to stdout
+            tracing_subscriber::fmt::layer()
+                .event_format(format_for_humans)
+                .with_ansi(use_colors_in_logs)
+                .with_span_events(FmtSpan::CLOSE)
+                .with_filter(log_level_filter),
+        ),
+    )
     .expect("failed to set subscriber");
     guard
 }
